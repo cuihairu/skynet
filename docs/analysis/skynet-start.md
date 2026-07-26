@@ -6,22 +6,31 @@
 
 启动流程的设计思路是：**先初始化基础设施，再启动业务服务，最后进入工作循环**。
 
-```
-skynet_start()
-    │
-    ├── 1. 信号处理
-    ├── 2. 守护进程
-    ├── 3. 初始化子系统
-    │       ├── harbor (集群)
-    │       ├── handle (句柄)
-    │       ├── mq (消息队列)
-    │       ├── module (模块)
-    │       ├── timer (定时器)
-    │       └── socket (网络)
-    │
-    ├── 4. 启动日志服务
-    ├── 5. 启动业务服务 (bootstrap)
-    └── 6. 进入工作循环 (start)
+```mermaid
+graph TB
+    Start[skynet_start] --> A[1. 信号处理]
+    A --> B[2. 守护进程]
+    B --> C[3. 初始化子系统]
+    
+    subgraph 初始化子系统
+        C1[harbor 集群]
+        C2[handle 句柄]
+        C3[mq 消息队列]
+        C4[module 模块]
+        C5[timer 定时器]
+        C6[socket 网络]
+    end
+    
+    C --> C1
+    C --> C2
+    C --> C3
+    C --> C4
+    C --> C5
+    C --> C6
+    
+    C6 --> D[4. 启动日志服务]
+    D --> E[5. 启动业务服务]
+    E --> F[6. 进入工作循环]
 ```
 
 ## 核心数据结构
@@ -123,12 +132,13 @@ skynet_start(struct skynet_config * config) {
 
 ### 子系统依赖关系
 
-```
-harbor ──→ handle ──→ mq ──→ module
-                         │
-                         ├──→ timer
-                         │
-                         └──→ socket
+```mermaid
+graph LR
+    Harbor[harbor] --> Handle[handle]
+    Handle --> MQ[mq]
+    MQ --> Module[module]
+    MQ --> Timer[timer]
+    MQ --> Socket[socket]
 ```
 
 ## 工作线程

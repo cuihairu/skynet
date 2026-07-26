@@ -128,51 +128,18 @@ skynet_context_new(const char * name, const char *param) {
 
 **流程图**：
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    服务创建流程                             │
-├─────────────────────────────────────────────────────────────┤
-│  skynet_context_new(name, param)                           │
-│       │                                                     │
-│       ▼                                                     │
-│  ┌─────────────────┐                                       │
-│  │ 查询模块        │ skynet_module_query(name)             │
-│  └────────┬────────┘                                       │
-│           │                                                  │
-│           ▼                                                  │
-│  ┌─────────────────┐                                       │
-│  │ 创建模块实例    │ skynet_module_instance_create(mod)     │
-│  └────────┬────────┘                                       │
-│           │                                                  │
-│           ▼                                                  │
-│  ┌─────────────────┐                                       │
-│  │ 分配上下文      │ skynet_malloc(sizeof(*ctx))           │
-│  └────────┬────────┘                                       │
-│           │                                                  │
-│           ▼                                                  │
-│  ┌─────────────────┐                                       │
-│  │ 注册句柄        │ skynet_handle_register(ctx)           │
-│  └────────┬────────┘                                       │
-│           │                                                  │
-│           ▼                                                  │
-│  ┌─────────────────┐                                       │
-│  │ 创建消息队列    │ skynet_mq_create(handle)              │
-│  └────────┬────────┘                                       │
-│           │                                                  │
-│           ▼                                                  │
-│  ┌─────────────────┐                                       │
-│  │ 初始化模块      │ skynet_module_instance_init(...)       │
-│  └────────┬────────┘                                       │
-│           │                                                  │
-│     ┌─────┴─────┐                                          │
-│     │           │                                          │
-│     ▼           ▼                                          │
-│  成功          失败                                         │
-│     │           │                                          │
-│     ▼           ▼                                          │
-│  加入全局队列  清理资源                                     │
-│  返回句柄      返回 0                                       │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    Start[skynet_context_new<br/>name, param] --> A[查询模块<br/>skynet_module_query]
+    A --> B[创建模块实例<br/>skynet_module_instance_create]
+    B --> C[分配上下文<br/>skynet_malloc]
+    C --> D[注册句柄<br/>skynet_handle_register]
+    D --> E[创建消息队列<br/>skynet_mq_create]
+    E --> F[初始化模块<br/>skynet_module_instance_init]
+    
+    F --> G{初始化结果}
+    G -->|成功| H[加入全局队列<br/>返回句柄]
+    G -->|失败| I[清理资源<br/>返回 0]
 ```
 
 ### 2. 服务销毁 - skynet_context_release()
@@ -211,21 +178,17 @@ skynet_context_release(struct skynet_context *ctx) {
 
 **引用计数机制**：
 
-```
-引用计数变化：
-    初始值: 2 (register + init)
-    
-    创建后: 2
-        ↓ skynet_handle_register
-        2
-        ↓ skynet_context_release (init 完成)
-        1
-        ↓ 其他服务 grab
-        2
-        ↓ 其他服务 release
-        1
-        ↓ 自身 release
-        0 → 删除
+```mermaid
+graph LR
+    A[初始值: 2] --> B[register]
+    B --> C[release init完成]
+    C --> D[值: 1]
+    D --> E[其他服务 grab]
+    E --> F[值: 2]
+    F --> G[其他服务 release]
+    G --> H[值: 1]
+    H --> I[自身 release]
+    I --> J[值: 0 → 删除]
 ```
 
 ### 3. 引用管理 - skynet_context_grab()
@@ -290,30 +253,14 @@ skynet_send(struct skynet_context * context, uint32_t source, uint32_t destinati
 
 **消息发送流程**：
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    消息发送流程                             │
-├─────────────────────────────────────────────────────────────┤
-│  skynet_send(ctx, source, dest, type, session, data, sz)   │
-│       │                                                     │
-│       ▼                                                     │
-│  ┌─────────────────┐                                       │
-│  │ 检查消息大小    │ (sz & MESSAGE_TYPE_MASK) != sz        │
-│  └────────┬────────┘                                       │
-│           │                                                  │
-│           ▼                                                  │
-│  ┌─────────────────┐                                       │
-│  │ 设置源地址      │ source = context->handle              │
-│  └────────┬────────┘                                       │
-│           │                                                  │
-│     ┌─────┴─────┐                                          │
-│     │           │                                          │
-│     ▼           ▼                                          │
-│  远程消息     本地消息                                      │
-│     │           │                                          │
-│     ▼           ▼                                          │
-│  Harbor 发送  直接入队                                      │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    Start[skynet_send<br/>ctx, source, dest, type, session, data, sz] --> A[检查消息大小]
+    A --> B[设置源地址<br/>source = context->handle]
+    B --> C{消息类型}
+    
+    C -->|远程消息| D[Harbor 发送<br/>skynet_harbor_send]
+    C -->|本地消息| E[直接入队<br/>skynet_context_push]
 ```
 
 ### 2. 消息推入队列 - skynet_context_push()
