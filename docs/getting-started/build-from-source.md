@@ -23,7 +23,7 @@
 ## 获取源码
 
 ```bash
-git clone https://github.com/cloudwu/skynet.git
+git clone https://github.com/cuihairu/skynet.git
 cd skynet
 ```
 

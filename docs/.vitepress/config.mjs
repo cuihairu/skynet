@@ -134,7 +134,7 @@ export default {
       ]
     },
     socialLinks: [
-      { icon: "github", link: "https://github.com/cloudwu/skynet" }
+      { icon: "github", link: "https://github.com/cuihairu/skynet" }
     ],
     footer: {
       message: "基于源码的 Skynet 架构解析与设计原理分析",

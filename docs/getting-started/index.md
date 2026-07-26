@@ -75,7 +75,7 @@ Skynet 是云风开发的轻量级游戏服务器框架，在国内游戏行业�
 ### 构建 Skynet
 
 ```bash
-git clone https://github.com/cloudwu/skynet.git
+git clone https://github.com/cuihairu/skynet.git
 cd skynet
 make linux  # 或 macosx, freebsd
 ```
