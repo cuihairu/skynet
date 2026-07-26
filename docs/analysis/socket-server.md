@@ -106,17 +106,16 @@ Skynet 的网络 I/O 运行在独立线程中，与业务线程分离。这个�
 
 ### 通信机制
 
-```
-业务线程                      socket 线程
-    │                              │
-    │  1. 写入管道命令             │
-    │ ────────────────────────────→│
-    │                              │  2. 读取命令
-    │                              │  3. 执行 socket 操作
-    │                              │  4. 处理 epoll 事件
-    │  5. 接收结果消息             │
-    │ ←────────────────────────────│
-    │                              │
+```mermaid
+sequenceDiagram
+    participant BT as 业务线程
+    participant ST as socket 线程
+
+    BT->>ST: 1. 写入管道命令
+    ST->>ST: 2. 读取命令
+    ST->>ST: 3. 执行 socket 操作
+    ST->>ST: 4. 处理 epoll 事件
+    ST->>BT: 5. 接收结果消息
 ```
 
 ### 命令协议
@@ -341,14 +340,14 @@ if (s->wb_size >= WARNING_SIZE) {
 
 ### 背压机制
 
-```
-写缓冲大小：
-    0 ────────── 1MB ────────── 很大
-    │            │              │
-    │ 正常       │ 暂停读取     │ 报错
-    │            │              │
-    ▼            ▼              ▼
-  继续读取    等待消耗       关闭连接
+```mermaid
+graph LR
+    A[写缓冲大小] --> B[0]
+    A --> C[1MB]
+    A --> D[很大]
+    B --> E[正常<br/>继续读取]
+    C --> F[暂停读取<br/>等待消耗]
+    D --> G[报错<br/>关闭连接]
 ```
 
 **经验总结**：
@@ -359,19 +358,19 @@ if (s->wb_size >= WARNING_SIZE) {
 
 ## socket 类型状态机
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    socket 类型转换                          │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│  INVALID ──→ RESERVE ──→ PLISTEN ──→ LISTEN                │
-│     ↑           │                       │                    │
-│     │           │                       ▼                    │
-│     │           └──→ PACCEPT ──→ CONNECTED ←── CONNECTING   │
-│     │                           │                            │
-│     └───────────────────────────┴──→ HALFCLOSE ──→ INVALID  │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+stateDiagram-v2
+    [*] --> INVALID
+    INVALID --> RESERVE
+    RESERVE --> PLISTEN
+    PLISTEN --> LISTEN
+    RESERVE --> PACCEPT
+    PACCEPT --> CONNECTED
+    RESERVE --> CONNECTING
+    CONNECTING --> CONNECTED
+    CONNECTED --> HALFCLOSE
+    HALFCLOSE --> INVALID
+    LISTEN --> CONNECTED
 ```
 
 ### 各状态含义
