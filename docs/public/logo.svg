@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <circle cx="100" cy="100" r="90" stroke="#3451b2" stroke-width="8" fill="#f0f4ff"/>
+  <path d="M100 30 L170 100 L100 170 L30 100 Z" stroke="#3451b2" stroke-width="6" fill="#3451b2" opacity="0.1"/>
+  <path d="M100 60 L140 100 L100 140 L60 100 Z" stroke="#3451b2" stroke-width="4" fill="#3451b2" opacity="0.3"/>
+  <circle cx="100" cy="100" r="20" fill="#3451b2"/>
+  <text x="100" y="108" text-anchor="middle" fill="white" font-size="24" font-weight="bold">S</text>
+</svg>
