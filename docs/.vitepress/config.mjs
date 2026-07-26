@@ -5,6 +5,10 @@ export default {
   base: "/skynet/",
   cleanUrls: false,
   lastUpdated: true,
+  ignoreDeadLinks: [
+    /localhost/,
+    /\/analysis\/skynet-socket-lua/
+  ],
   markdown: {
     container: {
       tipLabel: "提示",

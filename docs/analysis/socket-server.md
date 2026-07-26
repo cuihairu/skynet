@@ -577,6 +577,6 @@ epoll + 非阻塞 I/O + 事件驱动，单线程可处理数万连接。
 
 ## 下一步
 
-- [skynet_socket.c 分析](/analysis/skynet-socket-lua) - 上层封装
+- [socket 模块](/analysis/socket-lua) - 上层封装
 - [网络 I/O 设计](/architecture/network-io) - 架构设计
 - [Gate 服务](/analysis/gate-service) - 网关实现
