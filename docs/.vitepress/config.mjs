@@ -1,4 +1,6 @@
-export default {
+import { withMermaid } from "vitepress-plugin-mermaid";
+
+export default withMermaid({
   lang: "zh-CN",
   title: "Skynet 源码解析",
   description: "深入解析 Skynet 游戏服务器框架的架构设计与核心实现",
@@ -17,6 +19,12 @@ export default {
       infoLabel: "信息",
       detailsLabel: "详细信息"
     }
+  },
+  mermaid: {
+    theme: "default",
+  },
+  mermaidPlugin: {
+    class: "mermaid",
   },
   themeConfig: {
     logo: "/logo.svg",
@@ -141,4 +149,4 @@ export default {
       copyright: "Skynet Source Code Analysis"
     }
   }
-}
+})
