@@ -1,0 +1,9 @@
+include "examples/config.path"
+thread = 2
+logger = nil
+logpath = "."
+harbor = 0
+address = "127.0.0.1:2527"
+start = "autotest_helper"
+bootstrap = "snlua bootstrap"
+cpath = root.."cservice/?.so"
