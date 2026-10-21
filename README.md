@@ -14,6 +14,8 @@ The community is friendly and almost all contributors can speak English, so Engl
 
 ```bash
 # 安装依赖
+
+[![Status](https://img.shields.io/badge/status-in%20development-orange)](https://github.com/cuihairu/skynet/releases)
 npm install
 
 # 启动文档服务器
