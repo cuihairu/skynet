@@ -15,7 +15,9 @@ The community is friendly and almost all contributors can speak English, so Engl
 ```bash
 # 安装依赖
 
-<p align="center">[![Status](https://img.shields.io/badge/status-in%20development-orange)](https://github.com/cuihairu/skynet/releases)</p>
+<p align="center">
+<a href="https://github.com/cuihairu/skynet/releases"><img alt="Status" src="https://img.shields.io/badge/status-in%20development-orange"></a>
+</p>
 npm install
 
 # 启动文档服务器
