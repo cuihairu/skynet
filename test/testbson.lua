@@ -100,3 +100,8 @@ print "\n[after replace]"
 t = b:decode()
 
 print("o.hello", bson.type(t.o.hello))
+
+-- run as a snlua service this script has no message loop, exit explicitly
+-- so test runners can observe a clean termination
+local skynet = require "skynet"
+skynet.exit()
