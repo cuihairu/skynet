@@ -237,17 +237,21 @@ skynet.start(function()
 	events = {}
 	local burst = {}
 	for i = 1, 1030 do
-		burst[#burst+1] = u16(4) .. string.format("p%03d", i)
+		local body = string.format("p%04d", i)
+		-- encode the real payload length, so the header stays in sync with
+		-- the body for every i ( %03d would overflow at i == 1000 )
+		burst[#burst+1] = u16(body:len()) .. body
 	end
-	local all = table.concat(burst) call_client("send", all)
-	local dn=0 skynet.sleep(300) for _,e in ipairs(events) do if e.type=="data" then dn=dn+1 end end print("DBG data events=", dn, "total events=", #events)
+	local all = table.concat(burst)
+	call_client("send", all)
+	skynet.sleep(300)
 	local okcount = 0
 	for _, e in ipairs(events) do
 		if e.type == "data" and e[1]:match("^p%d+$") then
 			okcount = okcount + 1
 		end
 	end
-	print("DBG okcount=", okcount, "events=", #events) assert(okcount == 1030, "burst content count " .. okcount)
+	assert(okcount == 1030, "burst content count " .. okcount)
 
 	-- 9. close with an unfinished package pending ( close_uncomplete )
 	events = {}
