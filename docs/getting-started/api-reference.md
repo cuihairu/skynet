@@ -1,37 +1,37 @@
-# 核心 API
+# Core API
 
-Skynet 的 API 设计比较简洁，掌握了这些核心 API，就能完成大部分开发工作。这里整理了实际项目中最常用的一些接口。
+Skynet's API design is relatively simple. Once you have mastered these core APIs, you can complete most of the development work. This page collects some of the most commonly used interfaces in real projects.
 
-## 服务生命周期 API
+## Service Lifecycle API
 
 ### skynet.start(func)
 
-启动服务，注册初始化函数：
+Start a service and register an initialization function:
 
 ```lua
 local skynet = require "skynet"
 
 skynet.start(function()
-    -- 服务初始化代码
+    -- Service initialization code
     
-    -- 注册消息处理函数
+    -- Register a message handler
     skynet.dispatch("lua", function(session, address, cmd, ...)
-        -- 消息处理逻辑
+        -- Message handling logic
     end)
 end)
 ```
 
 ### skynet.exit()
 
-退出当前服务：
+Exit the current service:
 
 ```lua
 skynet.dispatch("lua", function(session, address, cmd, ...)
     if cmd == "shutdown" then
-        -- 清理资源
+        -- Clean up resources
         cleanup()
         
-        -- 退出服务
+        -- Exit the service
         skynet.exit()
     end
 end)
@@ -39,7 +39,7 @@ end)
 
 ### skynet.atexit(func)
 
-注册服务退出时的清理函数：
+Register a cleanup function for when the service exits:
 
 ```lua
 skynet.start(function()
@@ -51,49 +51,49 @@ skynet.start(function()
 end)
 ```
 
-## 消息通信 API
+## Message Communication API
 
 ### skynet.send(addr, type, ...)
 
-发送消息（单向，不等待回复）：
+Send a message (one-way, no reply is awaited):
 
 ```lua
--- 发送消息
+-- Send a message
 skynet.send(target, "lua", "update", data)
 
--- 发送给指定地址
+-- Send to a specific address
 skynet.send(0x1000001, "lua", "ping")
 ```
 
-**参数说明**：
-- `addr`：目标服务地址
-- `type`：消息类型（通常是 "lua"）
-- `...`：消息参数
+**Parameters**:
+- `addr`: Target service address
+- `type`: Message type (usually "lua")
+- `...`: Message arguments
 
 ### skynet.call(addr, type, ...)
 
-发送消息并等待回复（同步调用）：
+Send a message and wait for a reply (synchronous call):
 
 ```lua
--- 发送消息并等待回复
+-- Send a message and wait for a reply
 local result = skynet.call(target, "lua", "query", key)
 
--- 处理结果
+-- Handle the result
 if result then
     print("Query result:", result)
 end
 ```
 
-**参数说明**：
-- `addr`：目标服务地址
-- `type`：消息类型
-- `...`：消息参数
+**Parameters**:
+- `addr`: Target service address
+- `type`: Message type
+- `...`: Message arguments
 
-**返回值**：目标服务的返回值
+**Return value**: The return value from the target service
 
 ### skynet.ret(...)
 
-在消息处理函数中返回结果：
+Return a result from within a message handler:
 
 ```lua
 skynet.dispatch("lua", function(session, address, cmd, ...)
@@ -101,7 +101,7 @@ skynet.dispatch("lua", function(session, address, cmd, ...)
         local key = ...
         local result = get_value(key)
         
-        -- 返回结果
+        -- Return the result
         skynet.ret(skynet.pack(result))
     end
 end)
@@ -109,69 +109,69 @@ end)
 
 ### skynet.response()
 
-忽略消息，不返回结果：
+Ignore the message without returning a result:
 
 ```lua
 skynet.dispatch("lua", function(session, address, cmd, ...)
     if cmd == "fire_and_forget" then
-        -- 忽略响应
+        -- Ignore the response
         skynet.response()
         
-        -- 处理消息但不返回结果
+        -- Process the message without returning a result
         process(data)
     end
 end)
 ```
 
-## 打包与解包
+## Packing and Unpacking
 
 ### skynet.pack(...)
 
-打包数据为字符串：
+Pack data into a string:
 
 ```lua
--- 打包多个值
+-- Pack multiple values
 local data = skynet.pack(value1, value2, value3)
 
--- 打包表
+-- Pack a table
 local data = skynet.pack({key = "value"})
 ```
 
 ### skynet.unpack(data)
 
-解包字符串为原始值：
+Unpack a string back into its original values:
 
 ```lua
--- 解包数据
+-- Unpack data
 local value1, value2, value3 = skynet.unpack(data)
 
--- 解包表
+-- Unpack a table
 local t = skynet.unpack(data)
 ```
 
-## 服务管理 API
+## Service Management API
 
 ### skynet.newservice(name, ...)
 
-创建新的服务：
+Create a new service:
 
 ```lua
--- 创建服务
+-- Create a service
 local player = skynet.newservice("player", player_id)
 
--- 创建服务并传递参数
+-- Create a service and pass arguments
 local game = skynet.newservice("game", "room_1", 100)
 ```
 
-**参数说明**：
-- `name`：服务名称（对应 service/ 目录下的文件）
-- `...`：传递给服务的参数
+**Parameters**:
+- `name`: Service name (corresponding to a file under the service/ directory)
+- `...`: Arguments passed to the service
 
-**返回值**：新服务的地址
+**Return value**: The address of the new service
 
 ### skynet.self()
 
-获取当前服务的地址：
+Get the address of the current service:
 
 ```lua
 local my_address = skynet.self()
@@ -180,83 +180,83 @@ print("My address:", my_address)
 
 ### skynet.address(addr)
 
-将地址转换为可读字符串：
+Convert an address into a human-readable string:
 
 ```lua
 local addr_str = skynet.address(addr)
-print("Address:", addr_str)  -- 输出: :00000001
+print("Address:", addr_str)  -- Output: :00000001
 ```
 
-## 名称服务 API
+## Name Service API
 
 ### skynet.register(name)
 
-注册当前服务的本地名称：
+Register a local name for the current service:
 
 ```lua
 skynet.start(function()
-    -- 注册服务名称
+    -- Register the service name
     skynet.register("player_service")
     
     skynet.dispatch("lua", function(session, address, cmd, ...)
-        -- 处理消息
+        -- Handle messages
     end)
 end)
 ```
 
 ### skynet.localname(name)
 
-按本地名称查找服务：
+Look up a service by local name:
 
 ```lua
--- 查找本地服务
+-- Look up a local service
 local player_service = skynet.localname("player_service")
 
--- 发送消息
+-- Send a message
 skynet.send(player_service, "lua", "update", data)
 ```
 
 ### skynet.name(name, addr)
 
-注册全局名称（跨节点）：
+Register a global name (cross-node):
 
 ```lua
 skynet.start(function()
-    -- 注册全局名称
+    -- Register a global name
     skynet.name("player_service", skynet.self())
 end)
 ```
 
 ### skynet.queryservice(name)
 
-查询全局服务：
+Query a global service:
 
 ```lua
--- 查询全局服务
+-- Query a global service
 local player_service = skynet.queryservice("player_service")
 
--- 发送消息
+-- Send a message
 skynet.send(player_service, "lua", "update", data)
 ```
 
-## 定时器 API
+## Timer API
 
 ### skynet.timeout(ti, func)
 
-设置定时器：
+Set a timer:
 
 ```lua
--- 100 毫秒后执行
+-- Execute after 100 milliseconds
 skynet.timeout(100, function()
     print("Timeout!")
 end)
 
--- 循环定时器
+-- Repeating timer
 local function heartbeat()
-    -- 处理心跳
+    -- Handle the heartbeat
     process_heartbeat()
     
-    -- 5 秒后再次执行
+    -- Execute again after 5 seconds
     skynet.timeout(500, heartbeat)
 end
 
@@ -265,13 +265,13 @@ skynet.start(function()
 end)
 ```
 
-**参数说明**：
-- `ti`：超时时间（毫秒）
-- `func`：超时回调函数
+**Parameters**:
+- `ti`: Timeout duration (in milliseconds)
+- `func`: Timeout callback function
 
 ### skynet.now()
 
-获取当前时间（0.01 秒为单位）：
+Get the current time (in units of 0.01 seconds):
 
 ```lua
 local current_time = skynet.now()
@@ -280,7 +280,7 @@ print("Current time:", current_time)
 
 ### skynet.time()
 
-获取当前时间（秒）：
+Get the current time (in seconds):
 
 ```lua
 local current_time = skynet.time()
@@ -289,130 +289,130 @@ print("Current time:", current_time)
 
 ### skynet.sleep(ti)
 
-休眠指定时间：
+Sleep for a specified duration:
 
 ```lua
--- 休眠 1 秒
+-- Sleep for 1 second
 skynet.sleep(100)
 
--- 在协程中休眠
+-- Sleep inside a coroutine
 skynet.fork(function()
     skynet.sleep(100)
     print("Wake up!")
 end)
 ```
 
-## 协程 API
+## Coroutine API
 
 ### skynet.fork(func)
 
-创建新协程：
+Create a new coroutine:
 
 ```lua
--- 创建新协程
+-- Create a new coroutine
 skynet.fork(function()
     print("Running in coroutine")
     skynet.sleep(100)
     print("After sleep")
 end)
 
--- 继续执行
+-- Continue execution
 print("Main thread continues")
 ```
 
 ### skynet.fcall(addr, type, ...)
 
-异步调用（不阻塞）：
+Asynchronous call (non-blocking):
 
 ```lua
--- 异步调用
+-- Asynchronous call
 local co = skynet.fcall(target, "lua", "query", key)
 
--- 做其他事情
+-- Do something else
 do_something_else()
 
--- 等待结果
+-- Wait for the result
 local result = skynet.wait(co)
 ```
 
 ### skynet.wait(co)
 
-等待协程结果：
+Wait for a coroutine's result:
 
 ```lua
--- 等待异步调用结果
+-- Wait for the result of an asynchronous call
 local result = skynet.wait(co)
 ```
 
 ### skynet.wakeup(co)
 
-唤醒协程：
+Wake up a coroutine:
 
 ```lua
--- 唤醒休眠的协程
+-- Wake up a sleeping coroutine
 skynet.wakeup(co)
 ```
 
-## 集群 API
+## Cluster API
 
-### skynet.call(addr, type, ...) (跨节点)
+### skynet.call(addr, type, ...) (Cross-Node)
 
-跨节点调用：
+Cross-node call:
 
 ```lua
--- 跨节点调用
+-- Cross-node call
 local result = skynet.call("node2@player_service", "lua", "query", key)
 ```
 
-### skynet.send(addr, type, ...) (跨节点)
+### skynet.send(addr, type, ...) (Cross-Node)
 
-跨节点发送：
+Cross-node send:
 
 ```lua
--- 跨节点发送
+-- Cross-node send
 skynet.send("node2@player_service", "lua", "update", data)
 ```
 
-## 调试 API
+## Debugging API
 
 ### skynet.trace(flag)
 
-开启/关闭消息追踪：
+Enable/disable message tracing:
 
 ```lua
--- 开启追踪
+-- Enable tracing
 skynet.trace("msg")
 
--- 关闭追踪
+-- Disable tracing
 skynet.trace(false)
 ```
 
 ### skynet.error(...)
 
-记录错误日志：
+Log an error:
 
 ```lua
--- 记录错误
+-- Log an error
 skynet.error("Something went wrong:", error_msg)
 ```
 
-## 实用工具
+## Practical Utilities
 
-### skynet.pack 与 skynet.unpack
+### skynet.pack and skynet.unpack
 
-用于消息的序列化和反序列化：
+Used for serializing and deserializing messages:
 
 ```lua
--- 打包
+-- Pack
 local data = skynet.pack(arg1, arg2, arg3)
 
--- 解包
+-- Unpack
 local arg1, arg2, arg3 = skynet.unpack(data)
 ```
 
 ### skynet.tostring
 
-将地址转换为字符串：
+Convert an address into a string:
 
 ```lua
 local addr = skynet.self()
@@ -420,9 +420,9 @@ local addr_str = skynet.tostring(addr)
 print("Address:", addr_str)
 ```
 
-## 完整示例
+## Complete Examples
 
-### 简单的 Echo 服务
+### A Simple Echo Service
 
 ```lua
 -- echo.lua
@@ -432,13 +432,13 @@ skynet.start(function()
     print("Echo service started")
     
     skynet.dispatch("lua", function(session, address, ...)
-        -- 回显消息
+        -- Echo the message
         skynet.ret(skynet.pack(...))
     end)
 end)
 ```
 
-### 简单的计数器服务
+### A Simple Counter Service
 
 ```lua
 -- counter.lua
@@ -463,22 +463,22 @@ skynet.start(function()
 end)
 ```
 
-### 使用示例
+### Usage Example
 
 ```lua
 -- main.lua
 local skynet = require "skynet"
 
 skynet.start(function()
-    -- 创建服务
+    -- Create services
     local echo = skynet.newservice("echo")
     local counter = skynet.newservice("counter")
     
-    -- 使用 Echo 服务
+    -- Use the Echo service
     local result = skynet.call(echo, "lua", "hello", "world")
     print("Echo result:", result)
     
-    -- 使用计数器服务
+    -- Use the counter service
     local count = skynet.call(counter, "lua", "increment")
     print("Count:", count)
     
@@ -490,29 +490,29 @@ skynet.start(function()
 end)
 ```
 
-## API 速查表
+## API Quick Reference
 
-| API | 说明 | 是否阻塞 |
+| API | Description | Blocking |
 |-----|------|----------|
-| `skynet.start(func)` | 启动服务 | 否 |
-| `skynet.exit()` | 退出服务 | 否 |
-| `skynet.send(addr, type, ...)` | 发送消息 | 否 |
-| `skynet.call(addr, type, ...)` | 调用并等待 | 是 |
-| `skynet.ret(...)` | 返回结果 | 否 |
-| `skynet.newservice(name, ...)` | 创建服务 | 是 |
-| `skynet.self()` | 获取自身地址 | 否 |
-| `skynet.register(name)` | 注册本地名称 | 否 |
-| `skynet.localname(name)` | 查找本地服务 | 否 |
-| `skynet.timeout(ti, func)` | 设置定时器 | 否 |
-| `skynet.sleep(ti)` | 休眠 | 是 |
-| `skynet.fork(func)` | 创建协程 | 否 |
-| `skynet.fcall(addr, type, ...)` | 异步调用 | 否 |
-| `skynet.wait(co)` | 等待协程 | 是 |
-| `skynet.pack(...)` | 打包数据 | 否 |
-| `skynet.unpack(data)` | 解包数据 | 否 |
+| `skynet.start(func)` | Start a service | No |
+| `skynet.exit()` | Exit a service | No |
+| `skynet.send(addr, type, ...)` | Send a message | No |
+| `skynet.call(addr, type, ...)` | Call and wait | Yes |
+| `skynet.ret(...)` | Return a result | No |
+| `skynet.newservice(name, ...)` | Create a service | Yes |
+| `skynet.self()` | Get own address | No |
+| `skynet.register(name)` | Register a local name | No |
+| `skynet.localname(name)` | Look up a local service | No |
+| `skynet.timeout(ti, func)` | Set a timer | No |
+| `skynet.sleep(ti)` | Sleep | Yes |
+| `skynet.fork(func)` | Create a coroutine | No |
+| `skynet.fcall(addr, type, ...)` | Asynchronous call | No |
+| `skynet.wait(co)` | Wait for a coroutine | Yes |
+| `skynet.pack(...)` | Pack data | No |
+| `skynet.unpack(data)` | Unpack data | No |
 
-## 下一步
+## Next Steps
 
-- [架构概览](/architecture/overview) - 理解 Skynet 的整体架构
-- [Actor 模型](/architecture/actor-model) - 深入理解 Actor 模型
-- [消息驱动设计](/architecture/message-driven) - 掌握消息系统
+- [Architecture Overview](/architecture/overview) - Understand Skynet's overall architecture
+- [Actor Model](/architecture/actor-model) - Deeply understand the Actor model
+- [Message-Driven Design](/architecture/message-driven) - Master the messaging system

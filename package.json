@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "docs:dev": "vitepress dev docs",
+    "docs:check": "node scripts/check-docs-links.mjs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs"
   },

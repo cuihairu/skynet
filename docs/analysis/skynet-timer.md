@@ -1,90 +1,90 @@
-# skynet_timer.c 源码分析
+# skynet_timer.c Source Code Analysis
 
-`skynet_timer.c` 实现了 Skynet 的定时器系统，基于时间轮算法。在阅读源码的过程中，我们发现这个模块的设计对定时任务的精度和效率有重要影响。
+`skynet_timer.c` implements Skynet's timer system, based on the time-wheel algorithm. While reading the source code, we found that this module's design has an important impact on the precision and efficiency of scheduled tasks.
 
-## 文件概览
+## File Overview
 
-**职责**：定时器管理、超时处理
+**Responsibilities**: Timer management, timeout handling
 
-**核心数据结构**：
-- `timer` - 定时器
-- `timer_node` - 定时器节点
-- `link_list` - 链表
+**Core Data Structures**:
+- `timer` - Timer
+- `timer_node` - Timer node
+- `link_list` - Linked list
 
-**关键函数**：
-- `skynet_timeout()` - 设置超时
-- `skynet_updatetime()` - 更新时间
-- `skynet_now()` - 获取当前时间
+**Key Functions**:
+- `skynet_timeout()` - Set a timeout
+- `skynet_updatetime()` - Update time
+- `skynet_now()` - Get the current time
 
-## 核心数据结构
+## Core Data Structures
 
-### timer - 定时器
+### timer - Timer
 
 ```c
 struct timer {
-    struct link_list near[TIME_NEAR];      // 近期定时器（0-255）
-    struct link_list t[4][TIME_LEVEL];     // 远期定时器（4 级，每级 64）
-    struct spinlock lock;                  // 自旋锁
-    uint32_t time;                         // 当前时间
-    uint32_t starttime;                    // 启动时间
-    uint64_t current;                      // 当前时间（厘秒）
-    uint64_t current_point;                // 当前时间点
+    struct link_list near[TIME_NEAR];      // Near-term timers (0-255)
+    struct link_list t[4][TIME_LEVEL];     // Far-term timers (4 levels, 64 each)
+    struct spinlock lock;                  // Spinlock
+    uint32_t time;                         // Current time
+    uint32_t starttime;                    // Start time
+    uint64_t current;                      // Current time (centiseconds)
+    uint64_t current_point;                // Current time point
 };
 ```
 
-**设计要点**：
+**Design Points**:
 
-1. **时间轮算法**：使用多级时间轮管理定时器
-2. **分级存储**：近期定时器和远期定时器分开存储
-3. **自旋锁保护**：保证线程安全
+1. **Time-wheel Algorithm**: Uses a multi-level time wheel to manage timers
+2. **Tiered Storage**: Near-term and far-term timers are stored separately
+3. **Spinlock Protection**: Ensures thread safety
 
-### timer_node - 定时器节点
+### timer_node - Timer Node
 
 ```c
 struct timer_node {
-    struct timer_node *next;  // 链表指针
-    uint32_t expire;          // 过期时间
+    struct timer_node *next;  // Linked-list pointer
+    uint32_t expire;          // Expiration time
 };
 ```
 
-### timer_event - 定时器事件
+### timer_event - Timer Event
 
 ```c
 struct timer_event {
-    uint32_t handle;  // 服务句柄
-    int session;      // 会话 ID
+    uint32_t handle;  // Service handle
+    int session;      // Session ID
 };
 ```
 
-### link_list - 链表
+### link_list - Linked List
 
 ```c
 struct link_list {
-    struct timer_node head;   // 头节点
-    struct timer_node *tail;  // 尾指针
+    struct timer_node head;   // Head node
+    struct timer_node *tail;  // Tail pointer
 };
 ```
 
-## 时间轮算法
+## Time-wheel Algorithm
 
-### 时间轮结构
+### Time-wheel Structure
 
 ```mermaid
 graph TB
-    subgraph 时间轮
+    subgraph "Timer Wheel"
         direction TB
-        subgraph 近期定时器 near[256]
+        subgraph "Near-term Timers near[256]"
             N0[0]
             N1[1]
             N2[2]
             N255[255]
         end
         
-        subgraph 远期定时器 t[4][64]
-            L0[Level 0<br/>256-16383 厘秒]
-            L1[Level 1<br/>16384-1048575 厘秒]
-            L2[Level 2<br/>1048576-67108863 厘秒]
-            L3[Level 3<br/>67108864+ 厘秒]
+        subgraph "Far-term Timers t[4][64]"
+            L0[Level 0<br/>256-16383 centiseconds]
+            L1[Level 1<br/>16384-1048575 centiseconds]
+            L2[Level 2<br/>1048576-67108863 centiseconds]
+            L3[Level 3<br/>67108864+ centiseconds]
         end
     end
     
@@ -94,17 +94,17 @@ graph TB
     L3 --> L2
 ```
 
-### 时间范围
+### Time Ranges
 
-- **near**：0 - 255 厘秒（0 - 2.55 秒）
-- **Level 0**：256 - 16383 厘秒（2.56 - 163.83 秒）
-- **Level 1**：16384 - 1048575 厘秒（163.84 - 10485.75 秒）
-- **Level 2**：1048576 - 67108863 厘秒（10485.76 - 671088.63 秒）
-- **Level 3**：67108864+ 厘秒（671088.64+ 秒）
+- **near**: 0 - 255 centiseconds (0 - 2.55 seconds)
+- **Level 0**: 256 - 16383 centiseconds (2.56 - 163.83 seconds)
+- **Level 1**: 16384 - 1048575 centiseconds (163.84 - 10485.75 seconds)
+- **Level 2**: 1048576 - 67108863 centiseconds (10485.76 - 671088.63 seconds)
+- **Level 3**: 67108864+ centiseconds (671088.64+ seconds)
 
-## 定时器生命周期
+## Timer Lifecycle
 
-### 1. 创建定时器 - timer_create_timer()
+### 1. Create a Timer - timer_create_timer()
 
 ```c
 static struct timer *
@@ -114,12 +114,12 @@ timer_create_timer() {
     
     int i, j;
     
-    // 初始化近期定时器
+    // Initialize near-term timers
     for (i = 0; i < TIME_NEAR; i++) {
         link_clear(&r->near[i]);
     }
     
-    // 初始化远期定时器
+    // Initialize far-term timers
     for (i = 0; i < 4; i++) {
         for (j = 0; j < TIME_LEVEL; j++) {
             link_clear(&r->t[i][j]);
@@ -134,48 +134,48 @@ timer_create_timer() {
 }
 ```
 
-### 2. 初始化定时器系统 - skynet_timer_init()
+### 2. Initialize the Timer System - skynet_timer_init()
 
 ```c
 void 
 skynet_timer_init(void) {
-    // 创建定时器
+    // Create the timer
     TI = timer_create_timer();
     
-    // 获取系统时间
+    // Get the system time
     uint32_t current = 0;
     systime(&TI->starttime, &current);
     
-    // 设置当前时间
+    // Set the current time
     TI->current = current;
     TI->current_point = gettime();
 }
 ```
 
-## 定时器操作
+## Timer Operations
 
-### 1. 添加定时器 - timer_add()
+### 1. Add a Timer - timer_add()
 
 ```c
 static void
 timer_add(struct timer *T, void *arg, size_t sz, int time) {
-    // 1. 分配节点
+    // 1. Allocate the node
     struct timer_node *node = (struct timer_node *)skynet_malloc(sizeof(*node) + sz);
     memcpy(node + 1, arg, sz);
     
     SPIN_LOCK(T);
     
-    // 2. 设置过期时间
+    // 2. Set the expiration time
     node->expire = time + T->time;
     
-    // 3. 添加到时间轮
+    // 3. Add to the time wheel
     add_node(T, node);
     
     SPIN_UNLOCK(T);
 }
 ```
 
-### 2. 添加节点 - add_node()
+### 2. Add a Node - add_node()
 
 ```c
 static void
@@ -183,12 +183,12 @@ add_node(struct timer *T, struct timer_node *node) {
     uint32_t time = node->expire;
     uint32_t current_time = T->time;
     
-    // 1. 检查是否在近期范围
+    // 1. Check whether it is in the near-term range
     if ((time | TIME_NEAR_MASK) == (current_time | TIME_NEAR_MASK)) {
-        // 添加到近期定时器
+        // Add to the near-term timers
         link(&T->near[time & TIME_NEAR_MASK], node);
     } else {
-        // 2. 检查在哪个级别
+        // 2. Check which level
         int i;
         uint32_t mask = TIME_NEAR << TIME_LEVEL_SHIFT;
         
@@ -199,33 +199,33 @@ add_node(struct timer *T, struct timer_node *node) {
             mask <<= TIME_LEVEL_SHIFT;
         }
         
-        // 3. 添加到对应级别
+        // 3. Add to the corresponding level
         link(&T->t[i][((time >> (TIME_NEAR_SHIFT + i * TIME_LEVEL_SHIFT)) & TIME_LEVEL_MASK)], node);
     }
 }
 ```
 
-**添加流程**：
+**Add Flow**:
 
 ```mermaid
 graph TD
-    A[timer_add] --> B[分配节点<br/>skynet_malloc]
-    B --> C[设置过期时间<br/>node->expire = time + T->time]
-    C --> D[计算时间差<br/>diff = expire - current_time]
+    A[timer_add] --> B[Allocate the node<br/>skynet_malloc]
+    B --> C[Set the expiration time<br/>node->expire = time + T->time]
+    C --> D[Compute the time difference<br/>diff = expire - current_time]
     D --> E{diff < 256?}
-    E -->|是| F[near 数组<br/>近期定时器]
-    E -->|否| G[t 数组<br/>分级定时器]
+    E -->|Yes| F[near array<br/>Near-term timers]
+    E -->|No| G[t array<br/>Tiered timers]
 ```
 
-### 3. 移动节点 - move_list()
+### 3. Move a Node - move_list()
 
 ```c
 static void
 move_list(struct timer *T, int level, int idx) {
-    // 1. 清空链表
+    // 1. Clear the linked list
     struct timer_node *current = link_clear(&T->t[level][idx]);
     
-    // 2. 重新添加所有节点
+    // 2. Re-add all nodes
     while (current) {
         struct timer_node *temp = current->next;
         add_node(T, current);
@@ -234,7 +234,7 @@ move_list(struct timer *T, int level, int idx) {
 }
 ```
 
-### 4. 时间推进 - timer_shift()
+### 4. Advance Time - timer_shift()
 
 ```c
 static void
@@ -243,18 +243,18 @@ timer_shift(struct timer *T) {
     uint32_t ct = ++T->time;
     
     if (ct == 0) {
-        // 时间溢出，移动 Level 3
+        // Time overflow, move Level 3
         move_list(T, 3, 0);
     } else {
         uint32_t time = ct >> TIME_NEAR_SHIFT;
         int i = 0;
         
-        // 检查是否需要移动
+        // Check whether a move is needed
         while ((ct & (mask - 1)) == 0) {
             int idx = time & TIME_LEVEL_MASK;
             
             if (idx != 0) {
-                // 移动到近期定时器
+                // Move to the near-term timers
                 move_list(T, i, idx);
                 break;
             }
@@ -267,32 +267,32 @@ timer_shift(struct timer *T) {
 }
 ```
 
-**时间推进流程**：
+**Time Advancement Flow**:
 
 ```mermaid
 graph TD
-    A[timer_shift] --> B[时间加 1<br/>++T->time]
-    B --> C{溢出?}
-    C -->|是| D[移动 Level 3]
-    C -->|否| E[检查是否需要移动]
-    E --> F{低 8 位全 0?}
-    F -->|是| G[移动到 near]
-    F -->|否| H[不移动]
+    A[timer_shift] --> B[Increment time by 1<br/>++T->time]
+    B --> C{Overflow?}
+    C -->|Yes| D[Move Level 3]
+    C -->|No| E[Check whether a move is needed]
+    E --> F{Low 8 bits all 0?}
+    F -->|Yes| G[Move to near]
+    F -->|No| H[Do not move]
 ```
 
-### 5. 执行定时器 - timer_execute()
+### 5. Execute Timers - timer_execute()
 
 ```c
 static inline void
 timer_execute(struct timer *T) {
     int idx = T->time & TIME_NEAR_MASK;
     
-    // 处理所有到期的定时器
+    // Process all expired timers
     while (T->near[idx].head.next) {
         struct timer_node *current = link_clear(&T->near[idx]);
         SPIN_UNLOCK(T);
         
-        // 分发消息（不需要锁）
+        // Dispatch the messages (no lock needed)
         dispatch_list(current);
         
         SPIN_LOCK(T);
@@ -300,26 +300,26 @@ timer_execute(struct timer *T) {
 }
 ```
 
-### 6. 分发消息 - dispatch_list()
+### 6. Dispatch Messages - dispatch_list()
 
 ```c
 static inline void
 dispatch_list(struct timer_node *current) {
     do {
-        // 1. 获取事件
+        // 1. Get the event
         struct timer_event * event = (struct timer_event *)(current + 1);
         
-        // 2. 构造消息
+        // 2. Build the message
         struct skynet_message message;
         message.source = 0;
         message.session = event->session;
         message.data = NULL;
         message.sz = (size_t)PTYPE_RESPONSE << MESSAGE_TYPE_SHIFT;
         
-        // 3. 推入消息队列
+        // 3. Push into the message queue
         skynet_context_push(event->handle, &message);
         
-        // 4. 释放节点
+        // 4. Free the node
         struct timer_node * temp = current;
         current = current->next;
         skynet_free(temp);
@@ -327,35 +327,35 @@ dispatch_list(struct timer_node *current) {
 }
 ```
 
-### 7. 更新定时器 - timer_update()
+### 7. Update the Timer - timer_update()
 
 ```c
 static void 
 timer_update(struct timer *T) {
     SPIN_LOCK(T);
     
-    // 1. 执行超时 0 的定时器
+    // 1. Execute timers with a timeout of 0
     timer_execute(T);
     
-    // 2. 时间推进
+    // 2. Advance time
     timer_shift(T);
     
-    // 3. 执行到期的定时器
+    // 3. Execute expired timers
     timer_execute(T);
     
     SPIN_UNLOCK(T);
 }
 ```
 
-## 公开接口
+## Public Interface
 
-### 1. 设置超时 - skynet_timeout()
+### 1. Set a Timeout - skynet_timeout()
 
 ```c
 int
 skynet_timeout(uint32_t handle, int time, int session) {
     if (time <= 0) {
-        // 立即发送消息
+        // Send the message immediately
         struct skynet_message message;
         message.source = 0;
         message.session = session;
@@ -366,7 +366,7 @@ skynet_timeout(uint32_t handle, int time, int session) {
             return -1;
         }
     } else {
-        // 添加定时器
+        // Add a timer
         struct timer_event event;
         event.handle = handle;
         event.session = session;
@@ -377,7 +377,7 @@ skynet_timeout(uint32_t handle, int time, int session) {
 }
 ```
 
-### 2. 更新时间 - skynet_updatetime()
+### 2. Update Time - skynet_updatetime()
 
 ```c
 void
@@ -385,16 +385,16 @@ skynet_updatetime(void) {
     uint64_t cp = gettime();
     
     if (cp < TI->current_point) {
-        // 时间回退错误
+        // Time rollback error
         skynet_error(NULL, "time diff error: change from %lld to %lld", cp, TI->current_point);
         TI->current_point = cp;
     } else if (cp != TI->current_point) {
-        // 计算时间差
+        // Compute the time difference
         uint32_t diff = (uint32_t)(cp - TI->current_point);
         TI->current_point = cp;
         TI->current += diff;
         
-        // 更新定时器
+        // Update the timers
         int i;
         for (i = 0; i < diff; i++) {
             timer_update(TI);
@@ -403,7 +403,7 @@ skynet_updatetime(void) {
 }
 ```
 
-### 3. 获取当前时间 - skynet_now()
+### 3. Get the Current Time - skynet_now()
 
 ```c
 uint64_t 
@@ -412,7 +412,7 @@ skynet_now(void) {
 }
 ```
 
-### 4. 获取启动时间 - skynet_starttime()
+### 4. Get the Start Time - skynet_starttime()
 
 ```c
 uint32_t
@@ -421,9 +421,9 @@ skynet_starttime(void) {
 }
 ```
 
-## 时间获取
+## Time Retrieval
 
-### 系统时间 - systime()
+### System Time - systime()
 
 ```c
 static void
@@ -431,11 +431,11 @@ systime(uint32_t *sec, uint32_t *cs) {
     struct timespec ti;
     clock_gettime(CLOCK_REALTIME, ti);
     *sec = (uint32_t)ti.tv_sec;
-    *cs = (uint32_t)(ti.tv_nsec / 10000000);  // 转换为厘秒
+    *cs = (uint32_t)(ti.tv_nsec / 10000000);  // Convert to centiseconds
 }
 ```
 
-### 单调时间 - gettime()
+### Monotonic Time - gettime()
 
 ```c
 static uint64_t
@@ -443,13 +443,13 @@ gettime() {
     uint64_t t;
     struct timespec ti;
     clock_gettime(CLOCK_MONOTONIC, ti);
-    t = (uint64_t)ti.tv_sec * 100;  // 转换为厘秒
+    t = (uint64_t)ti.tv_sec * 100;  // Convert to centiseconds
     t += ti.tv_nsec / 10000000;
     return t;
 }
 ```
 
-### 线程时间 - skynet_thread_time()
+### Thread Time - skynet_thread_time()
 
 ```c
 uint64_t
@@ -461,9 +461,9 @@ skynet_thread_time(void) {
 }
 ```
 
-## 链表操作
+## Linked List Operations
 
-### 清空链表 - link_clear()
+### Clear the Linked List - link_clear()
 
 ```c
 static inline struct timer_node *
@@ -476,7 +476,7 @@ link_clear(struct link_list *list) {
 }
 ```
 
-### 添加节点 - link()
+### Add a Node - link()
 
 ```c
 static inline void
@@ -487,138 +487,138 @@ link(struct link_list *list, struct timer_node *node) {
 }
 ```
 
-## 线程安全
+## Thread Safety
 
-### 自旋锁使用
+### Spinlock Usage
 
 ```c
 SPIN_LOCK(T);
-// ... 临界区操作 ...
+// ... critical-section operations ...
 SPIN_UNLOCK(T);
 ```
 
-### 锁分离
+### Lock Separation
 
 ```c
-// timer_execute 中，分发消息时释放锁
+// In timer_execute, release the lock when dispatching messages
 while (T->near[idx].head.next) {
     struct timer_node *current = link_clear(&T->near[idx]);
-    SPIN_UNLOCK(T);  // 释放锁
+    SPIN_UNLOCK(T);  // Release the lock
     
-    dispatch_list(current);  // 分发消息
+    dispatch_list(current);  // Dispatch the messages
     
-    SPIN_LOCK(T);  // 重新获取锁
+    SPIN_LOCK(T);  // Re-acquire the lock
 }
 ```
 
-## 性能优化
+## Performance Optimizations
 
-### 1. 批量处理
+### 1. Batch Processing
 
 ```c
-// 一次处理多个时间单位
+// Process multiple time units at once
 for (i = 0; i < diff; i++) {
     timer_update(TI);
 }
 ```
 
-### 2. 锁分离
+### 2. Lock Separation
 
-分发消息时释放锁，减少锁竞争。
+Release the lock when dispatching messages to reduce lock contention.
 
-### 3. 缓存友好
+### 3. Cache Friendly
 
-链表节点连续分配，提高缓存命中率。
+Linked-list nodes are allocated contiguously to improve the cache hit rate.
 
-## 设计模式
+## Design Patterns
 
-### 1. 时间轮算法
-
-```
-时间轮特点：
-- O(1) 添加定时器
-- O(1) 推进时间
-- 分级存储，减少内存使用
-```
-
-### 2. 链表队列
+### 1. Time-wheel Algorithm
 
 ```
-链表特点：
-- 动态大小
-- O(1) 头部插入
-- O(1) 尾部追加
+Time-wheel characteristics:
+- O(1) timer addition
+- O(1) time advancement
+- Tiered storage reduces memory usage
 ```
 
-### 3. 生产者-消费者
+### 2. Linked-list Queue
 
 ```
-定时器作为生产者：
-    skynet_timeout() → 添加定时器
-    timer_update() → 分发消息
-
-服务作为消费者：
-    接收超时消息
+Linked-list characteristics:
+- Dynamic size
+- O(1) head insertion
+- O(1) tail append
 ```
 
-## 与其他模块的交互
+### 3. Producer-Consumer
 
-### 与 skynet_server.c 的交互
+```
+The timer as producer:
+    skynet_timeout() -> add a timer
+    timer_update() -> dispatch messages
+
+The service as consumer:
+    Receive timeout messages
+```
+
+## Interaction with Other Modules
+
+### Interaction with skynet_server.c
 
 ```c
-// 设置超时
+// Set a timeout
 skynet_timeout(handle, time, session);
 
-// 推入消息
+// Push a message
 skynet_context_push(handle, &message);
 ```
 
-### 与 skynet_start.c 的交互
+### Interaction with skynet_start.c
 
 ```c
-// 初始化定时器
+// Initialize the timer
 skynet_timer_init();
 
-// 定期更新时间
+// Update the time periodically
 skynet_updatetime();
 ```
 
-## 关键设计决策
+## Key Design Decisions
 
-### 1. 为什么使用时间轮？
+### 1. Why Use a Time Wheel?
 
-- **高效**：O(1) 添加和推进
-- **低内存**：分级存储，减少内存使用
-- **简单**：实现简单，易于理解
+- **Efficient**: O(1) addition and advancement
+- **Low Memory**: Tiered storage reduces memory usage
+- **Simple**: Simple implementation, easy to understand
 
-### 2. 为什么使用厘秒？
+### 2. Why Use Centiseconds?
 
-- **精度足够**：游戏定时器通常不需要毫秒级精度
-- **减少更新频率**：每 10 毫秒更新一次
-- **减少 CPU 消耗**：降低定时器更新的开销
+- **Sufficient Precision**: Game timers usually do not need millisecond-level precision
+- **Reduced Update Frequency**: Update once every 10 milliseconds
+- **Reduced CPU Usage**: Lower the overhead of timer updates
 
-### 3. 为什么使用自旋锁？
+### 3. Why Use a Spinlock?
 
-- **低延迟**：定时器操作很快
-- **避免上下文切换**：减少线程切换开销
-- **简单**：实现简单，易于理解
+- **Low Latency**: Timer operations are very fast
+- **Avoid Context Switches**: Reduce thread-switching overhead
+- **Simple**: Simple implementation, easy to understand
 
-## 常见问题
+## Common Questions
 
-### 1. 时间回退怎么办？
+### 1. What to Do About a Time Rollback?
 
-记录错误并继续运行。
+Record an error and continue running.
 
-### 2. 定时器溢出怎么办？
+### 2. What to Do About Timer Overflow?
 
-时间回绕到 0，移动 Level 3 的节点。
+The time wraps back to 0 and the Level 3 nodes are moved.
 
-### 3. 如何保证精度？
+### 3. How Is Precision Guaranteed?
 
-使用单调时间，避免系统时间调整影响。
+By using monotonic time to avoid the effects of system time adjustments.
 
-## 下一步
+## Next Steps
 
-- [socket_server.c 分析](/analysis/socket-server) - 网络 I/O 的实现
-- [skynet_start.c 分析](/analysis/skynet-start) - 系统启动的实现
-- [定时器系统](/architecture/timer-system) - 定时器的设计原理
+- [socket_server.c Analysis](/analysis/socket-server) - Network I/O implementation
+- [skynet_start.c Analysis](/analysis/skynet-start) - System startup implementation
+- [Timer System](/architecture/timer-system) - Timer design principles

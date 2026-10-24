@@ -1,242 +1,242 @@
-# 消息驱动设计
+# Message-Driven Design
 
-消息驱动是 Skynet 的核心设计理念之一。在多个项目实践中，我们发现理解消息系统是正确使用 Skynet 的关键。
+Message-driven design is one of Skynet's core design philosophies. Across multiple project practices, we have found that understanding the message system is the key to using Skynet correctly.
 
-## 消息驱动的概念
+## The Concept of Message-Driven Design
 
-在消息驱动架构中，有几个核心特点：
+In a message-driven architecture, there are several core characteristics:
 
-- **一切皆消息**：所有的交互都通过消息完成，包括服务间通信、定时器、网络事件等
-- **异步处理**：消息发送后立即返回，不等待处理完成，提高了系统的并发能力
-- **事件循环**：系统不断从消息队列取消息并处理，这是 Skynet 运行的基础
+- **Everything is a message**: all interactions are done through messages, including inter-service communication, timers, network events, etc.
+- **Asynchronous processing**: a message send returns immediately without waiting for processing to complete, which improves the system's concurrency
+- **Event loop**: the system continuously takes messages from the message queue and processes them; this is the foundation of Skynet's operation
 
-### 消息驱动 vs 函数调用
+### Message-Driven vs Function Call
 
 ```mermaid
 graph LR
-    subgraph 传统函数调用
-        A1[调用者] -->|直接调用| B1[被调用者]
-        B1 -->|等待返回| A1
+    subgraph Traditional Function Call
+        A1[Caller] -->|Direct call| B1[Callee]
+        B1 -->|Wait for return| A1
     end
     
-    subgraph 消息驱动
-        A2[发送者] -->|发送消息| B2[消息队列]
-        B2 -->|处理消息| C2[接收者]
+    subgraph Message Driven
+        A2[Sender] -->|Send message| B2[Message Queue]
+        B2 -->|Process message| C2[Receiver]
     end
 ```
 
-## Skynet 消息系统
+## The Skynet Message System
 
-### 消息结构
+### Message Structure
 
 ```c
 struct skynet_message {
-    uint32_t source;    // 消息来源（服务句柄）
-    int session;        // 会话 ID
-    void *data;         // 消息数据
-    size_t sz;          // 消息大小
+    uint32_t source;    // Message source (service handle)
+    int session;        // Session ID
+    void *data;         // Message data
+    size_t sz;          // Message size
 };
 ```
 
-### 消息类型
+### Message Types
 
-Skynet 支持多种消息类型：
+Skynet supports multiple message types:
 
 ```lua
--- 消息类型常量
-local PTYPE_TEXT = 0      -- 文本消息
-local PTYPE_RESPONSE = 1  -- 响应消息
-local PTYPE_ERROR = 2     -- 错误消息
-local PTYPE_LUA = 3       -- Lua 消息
-local PTYPE_SNAP = 4      -- 快照消息
+-- Message type constants
+local PTYPE_TEXT = 0      -- Text message
+local PTYPE_RESPONSE = 1  -- Response message
+local PTYPE_ERROR = 2     -- Error message
+local PTYPE_LUA = 3       -- Lua message
+local PTYPE_SNAP = 4      -- Snapshot message
 ```
 
-### 消息流向
+### Message Flow
 
 ```mermaid
 sequenceDiagram
-    participant 服务A
-    participant 消息队列
-    participant 服务B
+    participant ServiceA as Service A
+    participant MQ as Message Queue
+    participant ServiceB as Service B
     
-    服务A->>消息队列: send (异步)
-    消息队列->>服务B: dispatch
+    ServiceA->>MQ: send (async)
+    MQ->>ServiceB: dispatch
     
-    Note over 服务A,服务B: call 模式 (同步)
-    服务A->>消息队列: call (挂起)
-    消息队列->>服务B: dispatch
-    服务B->>消息队列: ret (回复)
-    消息队列->>服务A: 唤醒
+    Note over ServiceA,ServiceB: call mode (synchronous)
+    ServiceA->>MQ: call (suspend)
+    MQ->>ServiceB: dispatch
+    ServiceB->>MQ: ret (reply)
+    MQ->>ServiceA: wakeup
 ```
 
-## 核心消息操作
+## Core Message Operations
 
-### 1. 发送消息 (skynet.send)
+### 1. Sending Messages (skynet.send)
 
-单向发送消息，不等待回复：
+One-way message sending that does not wait for a reply:
 
 ```lua
 local skynet = require "skynet"
 
--- 发送消息
+-- Send a message
 skynet.send(target, type, ...)
 ```
 
-**特点**：
-- 异步操作，立即返回
-- 不保证消息被处理
-- 适用于通知、广播等场景
+**Characteristics**:
+- Asynchronous operation, returns immediately
+- Does not guarantee the message is processed
+- Suitable for scenarios such as notifications and broadcasts
 
-**示例**：
+**Example**:
 ```lua
--- 通知所有在线玩家
+-- Notify all online players
 for _, player in pairs(online_players) do
     skynet.send(player.address, "lua", "server_announcement", message)
 end
 ```
 
-### 2. 调用消息 (skynet.call)
+### 2. Calling Messages (skynet.call)
 
-发送消息并等待回复：
+Send a message and wait for the reply:
 
 ```lua
 local skynet = require "skynet"
 
--- 发送消息并等待回复
+-- Send a message and wait for the reply
 local result = skynet.call(target, type, ...)
 ```
 
-**特点**：
-- 同步操作（实际上是协程挂起）
-- 等待目标处理完成并返回结果
-- 适用于查询、请求等场景
+**Characteristics**:
+- Synchronous operation (actually a coroutine suspension)
+- Waits for the target to finish processing and return the result
+- Suitable for scenarios such as queries and requests
 
-**示例**：
+**Example**:
 ```lua
--- 查询玩家信息
+-- Query player information
 local player_info = skynet.call(player_service, "lua", "get_info", player_id)
 
--- 调用数据库服务
+-- Call the database service
 local data = skynet.call(db_service, "lua", "query", sql)
 ```
 
-### 3. 响应消息 (skynet.ret)
+### 3. Responding to Messages (skynet.ret)
 
-回复调用方的消息：
+Reply to the caller's message:
 
 ```lua
 local skynet = require "skynet"
 
 skynet.dispatch("lua", function(session, address, cmd, ...)
-    -- 处理消息
+    -- Process the message
     local result = process(cmd, ...)
     
-    -- 返回结果
+    -- Return the result
     skynet.ret(skynet.pack(result))
 end)
 ```
 
-**特点**：
-- 必须在 skynet.dispatch 回调中使用
-- 使用 skynet.pack 打包返回值
-- 会自动设置 session 以匹配请求
+**Characteristics**:
+- Must be used inside a skynet.dispatch callback
+- Uses skynet.pack to pack the return values
+- Automatically sets the session to match the request
 
-### 4. 忽略响应 (skynet.response)
+### 4. Ignoring Responses (skynet.response)
 
-对于不需要回复的消息：
+For messages that do not need a reply:
 
 ```lua
 skynet.dispatch("lua", function(session, address, cmd, ...)
     if cmd == "fire_and_forget" then
-        -- 忽略响应
+        -- Ignore the response
         skynet.response()
         return
     end
     
-    -- 正常处理
+    -- Normal processing
     skynet.ret(skynet.pack(result))
 end)
 ```
 
-## 消息队列机制
+## Message Queue Mechanism
 
-### 全局消息队列
-
-```mermaid
-graph TB
-    subgraph 全局消息队列
-        Q1[队列 1] --> Q2[队列 2]
-        Q2 --> Q3[队列 3]
-        Q3 --> Q4[队列 4]
-    end
-
-    subgraph 操作
-        Push[新队列入队] --> Q1
-        Q4 --> Pop[工作线程取队列]
-    end
-```
-
-**经验总结**：
-- 全局队列是一个链表结构，支持快速入队和出队
-- 工作线程从队列头部取服务队列
-- 新消息到达时，服务队列从尾部入队
-
-### 服务消息队列
+### Global Message Queue
 
 ```mermaid
 graph TB
-    subgraph 服务消息队列
-        M1[消息 1] --> M2[消息 2]
-        M2 --> M3[消息 3]
-        M3 --> M4[消息 4]
+    subgraph Global Message Queue
+        Q1[Queue 1] --> Q2[Queue 2]
+        Q2 --> Q3[Queue 3]
+        Q3 --> Q4[Queue 4]
     end
 
-    subgraph 操作
-        Push[新消息入队] --> M1
-        M4 --> Pop[消息出队处理]
+    subgraph Operations
+        Push[New queue enqueued] --> Q1
+        Q4 --> Pop[Worker thread takes queue]
     end
 ```
 
-**经验总结**：
-- 每个服务有独立的消息队列
-- 消息按 FIFO 顺序处理
-- 队列为空时，服务进入休眠状态
+**Lessons learned**:
+- The global queue is a linked-list structure that supports fast enqueue and dequeue
+- Worker threads take service queues from the head of the queue
+- When a new message arrives, the service queue is enqueued from the tail
 
-### 消息调度流程
+### Service Message Queue
+
+```mermaid
+graph TB
+    subgraph Service Message Queue
+        M1[Message 1] --> M2[Message 2]
+        M2 --> M3[Message 3]
+        M3 --> M4[Message 4]
+    end
+
+    subgraph Operations
+        Push[New message enqueued] --> M1
+        M4 --> Pop[Message dequeued for processing]
+    end
+```
+
+**Lessons learned**:
+- Each service has its own independent message queue
+- Messages are processed in FIFO order
+- When the queue is empty, the service goes to sleep
+
+### Message Scheduling Flow
 
 ```c
-// skynet_mq.c 中的关键函数
+// Key functions in skynet_mq.c
 
-// 消息入队
+// Message enqueue
 void skynet_mq_push(struct message_queue *q, struct skynet_message *message) {
     spinlock_lock(&q->lock);
     
-    // 检查队列是否已满
+    // Check whether the queue is full
     if (q->in_global == 0) {
-        // 将队列加入全局队列
+        // Add the queue to the global queue
         globalmq_push(q);
         q->in_global = 1;
     }
     
-    // 将消息放入队列
+    // Put the message into the queue
     q->queue[q->tail] = *message;
     q->tail = (q->tail + 1) % q->cap;
     
     spinlock_unlock(&q->lock);
 }
 
-// 消息出队
+// Message dequeue
 int skynet_mq_pop(struct message_queue *q, struct skynet_message *message) {
     spinlock_lock(&q->lock);
     
     if (q->head == q->tail) {
-        // 队列为空
+        // The queue is empty
         q->in_global = 0;
         spinlock_unlock(&q->lock);
         return 0;
     }
     
-    // 取出消息
+    // Take out the message
     *message = q->queue[q->head];
     q->head = (q->head + 1) % q->cap;
     
@@ -245,26 +245,26 @@ int skynet_mq_pop(struct message_queue *q, struct skynet_message *message) {
 }
 ```
 
-## 消息处理流程
+## Message Processing Flow
 
-### 工作线程处理消息
+### Worker Threads Processing Messages
 
 ```c
-// skynet_start.c 中的工作线程
+// Worker thread in skynet_start.c
 
 static void *thread_worker(void *p) {
     struct worker_parm *wp = p;
     int id = wp->id;
     
     while (!skynet_context_total()) {
-        // 从全局队列取消息队列
+        // Take a message queue from the global queue
         struct message_queue *q = globalmq_pop();
         
         if (q) {
-            // 处理队列中的消息
+            // Process the messages in the queue
             struct skynet_message msg;
             if (skynet_mq_pop(q, &msg)) {
-                // 找到对应的服务并处理消息
+                // Find the corresponding service and process the message
                 struct skynet_context *ctx = skynet_handle_grab(msg.source);
                 if (ctx) {
                     ctx->cb(ctx, ctx->cb_ud, msg.type, msg.session, 
@@ -279,19 +279,19 @@ static void *thread_worker(void *p) {
 }
 ```
 
-### Lua 层消息处理
+### Lua Layer Message Processing
 
 ```lua
--- skynet.lua 中的消息处理
+-- Message processing in skynet.lua
 
 function skynet.dispatch(type, func)
-    -- 注册消息处理函数
+    -- Register the message handler function
     local prototype = assert(proto[type])
     prototype.dispatch = func
 end
 
 function skynet.dispatch_message(...)
-    -- 分发消息到对应的处理函数
+    -- Dispatch the message to the corresponding handler function
     local p = proto[pt]
     if p.dispatch then
         p.dispatch(session, source, ...)
@@ -299,17 +299,17 @@ function skynet.dispatch_message(...)
 end
 ```
 
-## 消息模式
+## Message Patterns
 
-### 1. 请求-响应模式
+### 1. Request-Response Pattern
 
-最常见的模式，客户端发送请求，服务端返回响应：
+The most common pattern: the client sends a request and the server returns a response:
 
 ```lua
--- 客户端
+-- Client
 local result = skynet.call(service, "lua", "query", key)
 
--- 服务端
+-- Server
 skynet.dispatch("lua", function(session, address, cmd, key)
     if cmd == "query" then
         local value = get_value(key)
@@ -318,15 +318,15 @@ skynet.dispatch("lua", function(session, address, cmd, key)
 end)
 ```
 
-### 2. 单向通知模式
+### 2. One-Way Notification Pattern
 
-发送消息但不等待回复：
+Send a message without waiting for a reply:
 
 ```lua
--- 发送通知
+-- Send a notification
 skynet.send(player, "lua", "update_score", new_score)
 
--- 接收通知
+-- Receive the notification
 skynet.dispatch("lua", function(session, address, cmd, ...)
     if cmd == "update_score" then
         local score = ...
@@ -335,59 +335,59 @@ skynet.dispatch("lua", function(session, address, cmd, ...)
 end)
 ```
 
-### 3. 广播模式
+### 3. Broadcast Pattern
 
-向多个服务发送相同消息：
+Send the same message to multiple services:
 
 ```lua
--- 广播给所有在线玩家
+-- Broadcast to all online players
 for _, player in pairs(online_players) do
     skynet.send(player.address, "lua", "broadcast", message)
 end
 ```
 
-### 4. 请求转发模式
+### 4. Request Forwarding Pattern
 
-将请求转发给其他服务处理：
+Forward requests to other services for processing:
 
 ```lua
 skynet.dispatch("lua", function(session, address, cmd, ...)
     if cmd == "complex_query" then
-        -- 转发给专门的服务处理
+        -- Forward to a dedicated service for processing
         local result = skynet.call(analytics_service, "lua", cmd, ...)
         skynet.ret(skynet.pack(result))
     end
 end)
 ```
 
-## 消息与协程
+## Messages and Coroutines
 
-### 协程挂起与恢复
+### Coroutine Suspension and Resumption
 
-当调用 `skynet.call()` 时，当前协程会挂起：
+When `skynet.call()` is called, the current coroutine suspends:
 
 ```lua
 function handle_request()
-    -- 协程在此挂起，等待回复
+    -- The coroutine suspends here, waiting for the reply
     local result = skynet.call(service, "lua", "query", key)
     
-    -- 收到回复后，协程恢复执行
+    -- Once the reply arrives, the coroutine resumes execution
     process_result(result)
 end
 ```
 
-### 并发请求
+### Concurrent Requests
 
-可以同时发起多个请求：
+Multiple requests can be initiated at the same time:
 
 ```lua
 function fetch_multiple()
-    -- 同时发起多个请求
+    -- Initiate multiple requests at the same time
     local co1 = skynet.fcall(service1, "lua", "query1")
     local co2 = skynet.fcall(service2, "lua", "query2")
     local co3 = skynet.fcall(service3, "lua", "query3")
     
-    -- 等待所有结果
+    -- Wait for all results
     local result1 = skynet.wait(co1)
     local result2 = skynet.wait(co2)
     local result3 = skynet.wait(co3)
@@ -396,58 +396,58 @@ function fetch_multiple()
 end
 ```
 
-## 消息调试
+## Message Debugging
 
-### 消息追踪
+### Message Tracing
 
 ```lua
--- 开启消息追踪
+-- Enable message tracing
 skynet.trace("msg")
 
--- 所有消息都会被记录
+-- All messages will be logged
 skynet.send(service, "lua", "test")
--- 输出: [TRACE] msg send :00000001 -> :00000002 lua test
+-- Output: [TRACE] msg send :00000001 -> :00000002 lua test
 ```
 
-### 消息统计
+### Message Statistics
 
 ```lua
--- 获取服务的消息队列长度
+-- Get the message queue length of a service
 local queue_len = skynet.call(service, "debug", "QUEUE")
 ```
 
-## 最佳实践
+## Best Practices
 
-### 1. 消息设计原则
+### 1. Message Design Principles
 
 ```lua
--- 好：明确的消息类型和参数
+-- Good: explicit message type and parameters
 skynet.call(player, "lua", "update_hp", player_id, new_hp)
 skynet.call(player, "lua", "get_info", player_id)
 
--- 差：模糊的消息
+-- Bad: ambiguous messages
 skynet.call(player, "lua", "update", "hp", new_hp)
 skynet.call(player, "lua", "get", "info")
 ```
 
-### 2. 错误处理
+### 2. Error Handling
 
 ```lua
--- 使用 pcall 处理可能的错误
+-- Use pcall to handle possible errors
 local ok, result = pcall(function()
     return skynet.call(service, "lua", "risky_operation")
 end)
 
 if not ok then
-    -- 处理错误
+    -- Handle the error
     log("Error: " .. tostring(result))
 end
 ```
 
-### 3. 超时处理
+### 3. Timeout Handling
 
 ```lua
--- 使用 skynet.timeout 实现超时
+-- Use skynet.timeout to implement a timeout
 local co = skynet.fcall(service, "lua", "slow_query")
 local timeout = false
 
@@ -463,8 +463,8 @@ if timeout then
 end
 ```
 
-## 下一步
+## Next Steps
 
-- [消息队列实现](/architecture/message-queue) - 深入消息队列的实现细节
-- [服务调度](/architecture/service-scheduling) - 理解工作线程如何调度消息
-- [skynet_mq.c 分析](/analysis/skynet-mq) - 消息队列的源码分析
+- [Message Queue Implementation](/architecture/message-queue) - A deep dive into the implementation details of the message queue
+- [Service Scheduling](/architecture/service-scheduling) - Understand how worker threads schedule messages
+- [skynet_mq.c Analysis](/analysis/skynet-mq) - Source code analysis of the message queue

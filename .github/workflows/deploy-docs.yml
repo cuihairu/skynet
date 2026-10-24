@@ -39,6 +39,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check doc links
+        run: npm run docs:check
+
       - name: Build docs
         run: npm run docs:build
 

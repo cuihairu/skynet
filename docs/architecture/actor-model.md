@@ -1,113 +1,113 @@
-# Actor 模型
+# Actor Model
 
-Actor 模型是 Skynet 的核心设计范式。在实际项目中，我们发现理解这个模型对于正确使用 Skynet 至关重要。
+The Actor model is Skynet's core design paradigm. In real projects, we have found that understanding this model is essential for using Skynet correctly.
 
-## 什么是 Actor 模型
+## What Is the Actor Model
 
-Actor 模型是 Carl Hewitt 在 1973 年提出的并发计算模型。从实际应用角度看，它的核心思想是：
+The Actor model is a model of concurrent computation proposed by Carl Hewitt in 1973. From a practical application point of view, its core ideas are:
 
-- **Actor** 是计算的基本单元，每个 Actor 独立运行
-- 每个 Actor 拥有私有状态，不与其他 Actor 共享
-- Actor 之间通过消息传递通信，避免了锁的复杂性
-- 每个 Actor 一次处理一条消息，保证了线程安全
+- An **Actor** is the basic unit of computation; every Actor runs independently
+- Every Actor owns private state that is not shared with other Actors
+- Actors communicate through message passing, avoiding the complexity of locks
+- Every Actor processes one message at a time, which guarantees thread safety
 
-### Actor 的行为
+### Actor Behavior
 
-一个 Actor 可以执行以下操作：
+An Actor can perform the following operations:
 
-1. **发送消息**：向其他 Actor 发送消息
-2. **创建 Actor**：创建新的 Actor
-3. **改变状态**：修改自己的私有状态
-4. **指定行为**：决定如何处理下一条消息
+1. **Send messages**: send messages to other Actors
+2. **Create Actors**: create new Actors
+3. **Change state**: modify its own private state
+4. **Designate behavior**: decide how to handle the next message
 
 ```mermaid
 graph TB
     subgraph Actor
-        State[状态]
-        Mailbox[邮箱]
-        Logic[处理逻辑]
+        State[State]
+        Mailbox[Mailbox]
+        Logic[Processing Logic]
         
         State --> Mailbox
         Mailbox --> Logic
     end
     
-    Logic --> A[发送消息]
-    Logic --> B[创建 Actor]
-    Logic --> C[修改状态]
+    Logic --> A[Send message]
+    Logic --> B[Create Actor]
+    Logic --> C[Modify state]
 ```
 
-## Skynet 中的 Actor 实现
+## Actor Implementation in Skynet
 
-### 服务即 Actor
+### A Service Is an Actor
 
-在 Skynet 中，每个 **服务 (Service)** 就是一个 Actor：
+In Skynet, every **Service** is an Actor:
 
 ```c
 struct skynet_context {
-    void *instance;           // Actor 实例（状态）
-    struct skynet_module *mod; // Actor 类型
-    struct message_queue *queue; // Actor 邮箱
-    skynet_cb cb;             // Actor 行为（消息处理函数）
+    void *instance;           // Actor instance (state)
+    struct skynet_module *mod; // Actor type
+    struct message_queue *queue; // Actor mailbox
+    skynet_cb cb;             // Actor behavior (message handler)
     // ...
 };
 ```
 
-### 消息传递
+### Message Passing
 
-Actor 之间通过 `skynet_send()` 发送消息：
+Actors send messages to each other via `skynet_send()`:
 
 ```c
 int skynet_send(
-    struct skynet_context *context,  // 发送者
-    uint32_t source,                // 源地址
-    uint32_t destination,           // 目标地址
-    int type,                       // 消息类型
-    int session,                    // 会话 ID
-    void *data,                     // 消息数据
-    size_t size                     // 消息大小
+    struct skynet_context *context,  // Sender
+    uint32_t source,                // Source address
+    uint32_t destination,           // Destination address
+    int type,                       // Message type
+    int session,                    // Session ID
+    void *data,                     // Message data
+    size_t size                     // Message size
 );
 ```
 
-### 消息处理
+### Message Processing
 
-每个 Actor 通过回调函数处理消息：
+Every Actor processes messages through a callback function:
 
 ```c
 typedef int (*skynet_cb)(
-    struct skynet_context *ctx,  // Actor 上下文
-    void *ud,                    // 用户数据
-    int type,                    // 消息类型
-    int session,                 // 会话 ID
-    uint32_t source,             // 消息来源
-    const void *msg,             // 消息内容
-    size_t sz                    // 消息大小
+    struct skynet_context *ctx,  // Actor context
+    void *ud,                    // User data
+    int type,                    // Message type
+    int session,                 // Session ID
+    uint32_t source,             // Message source
+    const void *msg,             // Message content
+    size_t sz                    // Message size
 );
 ```
 
-## Lua 中的 Actor
+## Actors in Lua
 
-### 创建 Actor
+### Creating an Actor
 
 ```lua
 local skynet = require "skynet"
 
--- 创建一个新的 Actor（服务）
+-- Create a new Actor (service)
 local actor = skynet.newservice("my_actor")
 ```
 
-### 定义 Actor 行为
+### Defining Actor Behavior
 
 ```lua
 -- my_actor.lua
 local skynet = require "skynet"
 
--- Actor 的状态
+-- The Actor's state
 local state = {
     count = 0,
     data = {}
 }
 
--- Actor 的消息处理函数
+-- The Actor's message handler
 skynet.start(function()
     skynet.dispatch("lua", function(session, address, cmd, ...)
         if cmd == "add" then
@@ -124,69 +124,69 @@ skynet.start(function()
 end)
 ```
 
-### 与 Actor 通信
+### Communicating with an Actor
 
 ```lua
--- 发送消息并等待回复
+-- Send a message and wait for a reply
 local count = skynet.call(actor, "lua", "add")
 local value = skynet.call(actor, "lua", "get")
 
--- 单向发送（不等待回复）
+-- One-way send (no reply expected)
 skynet.send(actor, "lua", "set", "key", "value")
 ```
 
-## Actor 模型的优势
+## Advantages of the Actor Model
 
-### 1. 避免共享状态
+### 1. Avoiding Shared State
 
-传统多线程编程中，多个线程访问共享数据需要加锁：
+In traditional multithreaded programming, multiple threads accessing shared data must take a lock:
 
 ```c
-// 传统方式：需要锁
+// Traditional approach: a lock is required
 pthread_mutex_lock(&mutex);
 shared_data++;
 pthread_mutex_unlock(&mutex);
 
-// Actor 方式：无需锁
+// Actor approach: no lock needed
 skynet.send(actor, "lua", "increment")
 ```
 
-### 2. 天然并发
+### 2. Natural Concurrency
 
-每个 Actor 独立运行，可以并行处理消息：
+Every Actor runs independently and can process messages in parallel:
 
 ```mermaid
 gantt
-    title Actor 并发执行
+    title Concurrent Actor execution
     dateFormat X
     axisFormat %s
     
     section Actor A
-    处理消息1 :a1, 0, 100
-    处理消息2 :a2, 100, 200
-    处理消息3 :a3, 200, 300
+    Process message 1 :a1, 0, 100
+    Process message 2 :a2, 100, 200
+    Process message 3 :a3, 200, 300
     
     section Actor B
-    处理消息1 :b1, 0, 100
-    处理消息2 :b2, 100, 200
-    处理消息3 :b3, 200, 300
+    Process message 1 :b1, 0, 100
+    Process message 2 :b2, 100, 200
+    Process message 3 :b3, 200, 300
     
     section Actor C
-    处理消息1 :c1, 0, 100
-    处理消息2 :c2, 100, 200
-    处理消息3 :c3, 200, 300
+    Process message 1 :c1, 0, 100
+    Process message 2 :c2, 100, 200
+    Process message 3 :c3, 200, 300
 ```
 
-### 3. 易于理解和测试
+### 3. Easy to Understand and Test
 
-Actor 的行为完全由消息处理逻辑决定，没有副作用，易于测试：
+An Actor's behavior is determined entirely by its message-handling logic and has no side effects, which makes it easy to test:
 
 ```lua
--- 测试 Actor
+-- Test an Actor
 function test_actor()
     local actor = skynet.newservice("test_actor")
     
-    -- 发送消息并验证结果
+    -- Send messages and verify the results
     local result = skynet.call(actor, "lua", "add")
     assert(result == 1, "Expected 1, got " .. result)
     
@@ -195,11 +195,11 @@ function test_actor()
 end
 ```
 
-## Actor 模式的应用场景
+## Application Scenarios of the Actor Pattern
 
-### 1. 游戏实体
+### 1. Game Entities
 
-每个游戏实体（玩家、NPC、怪物）可以是一个 Actor：
+Every game entity (player, NPC, monster) can be an Actor:
 
 ```lua
 -- player.lua
@@ -217,19 +217,19 @@ skynet.start(function()
         if cmd == "move" then
             local x, y, z = ...
             player.position = {x = x, y = y, z = z}
-            -- 广播给周围的玩家
+            -- Broadcast to nearby players
             broadcast_nearby("player_move", player.id, x, y, z)
         elseif cmd == "attack" then
             local target_id = ...
-            -- 处理攻击逻辑
+            -- Handle attack logic
         end
     end)
 end)
 ```
 
-### 2. 管理器服务
+### 2. Manager Services
 
-各种管理器可以实现为 Actor：
+All kinds of managers can be implemented as Actors:
 
 ```lua
 -- room_manager.lua
@@ -250,9 +250,9 @@ skynet.start(function()
 end)
 ```
 
-### 3. 网关服务
+### 3. Gateway Service
 
-网关可以作为 Actor 处理客户端连接：
+The gateway can be an Actor that handles client connections:
 
 ```lua
 -- gate.lua
@@ -274,48 +274,48 @@ skynet.start(function()
 end)
 ```
 
-## 与其他并发模型的对比
+## Comparison with Other Concurrency Models
 
-| 特性 | Actor 模型 | 线程模型 | 协程模型 |
+| Feature | Actor Model | Thread Model | Coroutine Model |
 |------|-----------|---------|---------|
-| 共享状态 | 无 | 有 | 有限 |
-| 锁需求 | 无 | 需要 | 视情况 |
-| 并发粒度 | 消息级 | 线程级 | 协程级 |
-| 调度方式 | 消息驱动 | 抢占式 | 协作式 |
-| 适用场景 | 游戏、聊天 | 通用 | IO密集 |
+| Shared state | None | Yes | Limited |
+| Lock requirements | None | Required | Depends |
+| Concurrency granularity | Message level | Thread level | Coroutine level |
+| Scheduling | Message-driven | Preemptive | Cooperative |
+| Use cases | Games, chat | General purpose | IO-intensive |
 
-## 最佳实践
+## Best Practices
 
-### 1. 单一职责
+### 1. Single Responsibility
 
-每个 Actor 应该只负责一个功能：
+Every Actor should be responsible for exactly one thing:
 
 ```lua
--- 好：职责单一
-local player_actor = {}      -- 只处理玩家逻辑
-local inventory_actor = {}   -- 只处理背包逻辑
-local quest_actor = {}       -- 只处理任务逻辑
+-- Good: single responsibility
+local player_actor = {}      -- Only handles player logic
+local inventory_actor = {}   -- Only handles inventory logic
+local quest_actor = {}       -- Only handles quest logic
 
--- 差：职责混乱
-local god_actor = {}         -- 处理所有逻辑
+-- Bad: mixed responsibilities
+local god_actor = {}         -- Handles all logic
 ```
 
-### 2. 消息设计
+### 2. Message Design
 
-消息应该简洁明了：
+Messages should be concise and clear:
 
 ```lua
--- 好：明确的消息
+-- Good: explicit messages
 skynet.call(actor, "lua", "get_player_info", player_id)
 skynet.call(actor, "lua", "update_hp", player_id, new_hp)
 
--- 差：模糊的消息
+-- Bad: ambiguous messages
 skynet.call(actor, "lua", "do_something", "player", player_id, "hp", new_hp)
 ```
 
-### 3. 错误处理
+### 3. Error Handling
 
-Actor 应该优雅地处理错误：
+Actors should handle errors gracefully:
 
 ```lua
 skynet.dispatch("lua", function(session, address, cmd, ...)
@@ -326,13 +326,13 @@ skynet.dispatch("lua", function(session, address, cmd, ...)
     if ok then
         skynet.ret(skynet.pack(result))
     else
-        skynet.ret(skynet.pack(nil, result))  -- 返回错误信息
+        skynet.ret(skynet.pack(nil, result))  -- Return the error message
     end
 end)
 ```
 
-## 下一步
+## Next Steps
 
-- [消息驱动设计](/architecture/message-driven) - 深入理解消息系统
-- [服务与模块](/architecture/service-module) - 服务的创建和管理
-- [skynet_server.c 分析](/analysis/skynet-server) - 源码层面的 Actor 实现
+- [Message-Driven Design](/architecture/message-driven) - Understand the message system in depth
+- [Services and Modules](/architecture/service-module) - Creating and managing services
+- [skynet_server.c Analysis](/analysis/skynet-server) - Actor implementation at the source code level

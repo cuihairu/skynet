@@ -1,89 +1,89 @@
-# skynet_server.c 源码分析
+# Source Code Analysis of skynet_server.c
 
-`skynet_server.c` 是 Skynet 框架的核心模块，负责服务的创建、销毁、消息处理和调度。在阅读源码的过程中，我们发现这个模块的设计对理解 Skynet 的运行机制至关重要。
+`skynet_server.c` is the core module of the Skynet framework, responsible for service creation, destruction, message handling, and scheduling. While reading the source code, we found that the design of this module is essential for understanding how Skynet works.
 
-## 文件概览
+## File Overview
 
-**职责**：服务管理、消息处理、服务调度
+**Responsibility**: service management, message handling, service scheduling
 
-**核心数据结构**：
-- `skynet_context` - 服务上下文
-- `skynet_node` - 节点信息
+**Core data structures**:
+- `skynet_context` - service context
+- `skynet_node` - node information
 
-**关键函数**：
-- `skynet_context_new()` - 创建服务
-- `skynet_context_release()` - 释放服务
-- `skynet_send()` - 发送消息
-- `skynet_callback()` - 设置回调函数
+**Key functions**:
+- `skynet_context_new()` - create a service
+- `skynet_context_release()` - release a service
+- `skynet_send()` - send a message
+- `skynet_callback()` - set the callback function
 
-## 核心数据结构
+## Core Data Structures
 
-### skynet_context - 服务上下文
+### skynet_context - Service Context
 
 ```c
 struct skynet_context {
-    void * instance;              // 服务实例（C 模块或 Lua VM）
-    struct skynet_module * mod;   // 所属模块
-    void * cb_ud;                 // 回调用户数据
-    skynet_cb cb;                 // 消息回调函数
-    struct message_queue *queue;  // 消息队列
-    ATOM_POINTER logfile;         // 日志文件
-    uint64_t cpu_cost;           // CPU 消耗（微秒）
-    uint64_t cpu_start;          // 开始时间
-    char result[32];             // 结果缓冲区
-    uint32_t handle;             // 服务句柄（唯一标识）
-    int session_id;              // 会话 ID 计数器
-    ATOM_INT ref;                // 引用计数
-    size_t message_count;        // 消息计数
-    bool init;                   // 是否已初始化
-    bool endless;                // 是否死循环
-    bool profile;                // 是否开启性能分析
+    void * instance;              // service instance (C module or Lua VM)
+    struct skynet_module * mod;   // the module it belongs to
+    void * cb_ud;                 // callback user data
+    skynet_cb cb;                 // message callback function
+    struct message_queue *queue;  // message queue
+    ATOM_POINTER logfile;         // log file
+    uint64_t cpu_cost;           // CPU cost (microseconds)
+    uint64_t cpu_start;          // start time
+    char result[32];             // result buffer
+    uint32_t handle;             // service handle (unique identifier)
+    int session_id;              // session ID counter
+    ATOM_INT ref;                // reference count
+    size_t message_count;        // message count
+    bool init;                   // whether it is initialized
+    bool endless;                // whether it is stuck in an endless loop
+    bool profile;                // whether profiling is enabled
 };
 ```
 
-**设计要点**：
+**Design points**:
 
-1. **引用计数**：使用原子操作的引用计数管理生命周期
-2. **独立消息队列**：每个服务有自己的消息队列
-3. **性能监控**：内置 CPU 消耗统计
-4. **回调函数**：通过回调函数处理消息
+1. **Reference counting**: the lifecycle is managed with an atomically updated reference count
+2. **Dedicated message queue**: every service has its own message queue
+3. **Performance monitoring**: built-in CPU cost statistics
+4. **Callback function**: messages are handled through a callback function
 
-### skynet_node - 节点信息
+### skynet_node - Node Information
 
 ```c
 struct skynet_node {
-    ATOM_INT total;          // 服务总数
-    int init;                // 初始化标志
-    uint32_t monitor_exit;   // 监控退出的服务
-    pthread_key_t handle_key; // 线程本地存储
-    bool profile;            // 是否开启性能分析
+    ATOM_INT total;          // total number of services
+    int init;                // initialization flag
+    uint32_t monitor_exit;   // the service monitored for exit
+    pthread_key_t handle_key; // thread-local storage
+    bool profile;            // whether profiling is enabled
 };
 ```
 
-## 服务生命周期
+## Service Lifecycle
 
-### 1. 服务创建 - skynet_context_new()
+### 1. Creating a Service - skynet_context_new()
 
 ```c
 uint32_t
 skynet_context_new(const char * name, const char *param) {
-    // 1. 查询模块
+    // 1. Query the module
     struct skynet_module * mod = skynet_module_query(name);
     if (mod == NULL)
         return 0;
-    
-    // 2. 创建模块实例
+
+    // 2. Create the module instance
     void *inst = skynet_module_instance_create(mod);
     if (inst == NULL)
         return 0;
-    
-    // 3. 分配上下文
+
+    // 3. Allocate the context
     struct skynet_context * ctx = skynet_malloc(sizeof(*ctx));
-    
-    // 4. 初始化上下文
+
+    // 4. Initialize the context
     ctx->mod = mod;
     ctx->instance = inst;
-    ATOM_INIT(&ctx->ref, 2);  // 两个引用：register + init
+    ATOM_INIT(&ctx->ref, 2);  // Two references: register + init
     ctx->cb = NULL;
     ctx->cb_ud = NULL;
     ctx->session_id = 0;
@@ -93,28 +93,28 @@ skynet_context_new(const char * name, const char *param) {
     ctx->cpu_start = 0;
     ctx->message_count = 0;
     ctx->profile = G_NODE.profile;
-    
-    // 5. 注册句柄
+
+    // 5. Register the handle
     ctx->handle = 0;
     const uint32_t handle = skynet_handle_register(ctx);
     ctx->handle = handle;
-    
-    // 6. 创建消息队列
+
+    // 6. Create the message queue
     struct message_queue * queue = ctx->queue = skynet_mq_create(handle);
-    
-    // 7. 初始化模块
+
+    // 7. Initialize the module
     context_inc();
     int r = skynet_module_instance_init(mod, inst, ctx, param);
-    
+
     if (r == 0) {
-        // 8. 初始化成功
+        // 8. Initialization succeeded
         ctx->init = true;
-        skynet_globalmq_push(queue);  // 加入全局队列
+        skynet_globalmq_push(queue);  // push into the global queue
         skynet_error(ctx, "LAUNCH %s %s", name, param ? param : "");
-        skynet_context_release(ctx);  // 释放初始化引用
+        skynet_context_release(ctx);  // release the init reference
         return handle;
     } else {
-        // 9. 初始化失败
+        // 9. Initialization failed
         skynet_error(ctx, "error: launch %s FAILED", name);
         uint32_t handle = ctx->handle;
         skynet_context_release(ctx);
@@ -126,72 +126,72 @@ skynet_context_new(const char * name, const char *param) {
 }
 ```
 
-**流程图**：
+**Flowchart**:
 
 ```mermaid
 graph TB
-    Start[skynet_context_new<br/>name, param] --> A[查询模块<br/>skynet_module_query]
-    A --> B[创建模块实例<br/>skynet_module_instance_create]
-    B --> C[分配上下文<br/>skynet_malloc]
-    C --> D[注册句柄<br/>skynet_handle_register]
-    D --> E[创建消息队列<br/>skynet_mq_create]
-    E --> F[初始化模块<br/>skynet_module_instance_init]
-    
-    F --> G{初始化结果}
-    G -->|成功| H[加入全局队列<br/>返回句柄]
-    G -->|失败| I[清理资源<br/>返回 0]
+    Start[skynet_context_new<br/>name, param] --> A[Query the module<br/>skynet_module_query]
+    A --> B[Create the module instance<br/>skynet_module_instance_create]
+    B --> C[Allocate the context<br/>skynet_malloc]
+    C --> D[Register the handle<br/>skynet_handle_register]
+    D --> E[Create the message queue<br/>skynet_mq_create]
+    E --> F[Initialize the module<br/>skynet_module_instance_init]
+
+    F --> G{Initialization result}
+    G -->|Success| H[Push into the global queue<br/>Return the handle]
+    G -->|Failure| I[Clean up resources<br/>Return 0]
 ```
 
-### 2. 服务销毁 - skynet_context_release()
+### 2. Destroying a Service - skynet_context_release()
 
 ```c
 static void
 delete_context(struct skynet_context *ctx) {
-    // 关闭日志文件
+    // Close the log file
     FILE *f = (FILE *)ATOM_LOAD(&ctx->logfile);
     if (f) {
         fclose(f);
     }
-    
-    // 释放模块实例
+
+    // Release the module instance
     skynet_module_instance_release(ctx->mod, ctx->instance);
-    
-    // 标记消息队列为释放状态
+
+    // Mark the message queue for release
     skynet_mq_mark_release(ctx->queue);
-    
-    // 释放上下文
+
+    // Free the context
     skynet_free(ctx);
-    
-    // 减少节点服务计数
+
+    // Decrement the node's service count
     context_dec();
 }
 
 void
 skynet_context_release(struct skynet_context *ctx) {
-    // 原子减少引用计数
+    // Atomically decrement the reference count
     if (ATOM_FDEC(&ctx->ref) == 1) {
-        // 引用计数为 0，删除上下文
+        // The reference count reaches 0, delete the context
         delete_context(ctx);
     }
 }
 ```
 
-**引用计数机制**：
+**Reference counting mechanism**:
 
 ```mermaid
 graph LR
-    A[初始值: 2] --> B[register]
-    B --> C[release init完成]
-    C --> D[值: 1]
-    D --> E[其他服务 grab]
-    E --> F[值: 2]
-    F --> G[其他服务 release]
-    G --> H[值: 1]
-    H --> I[自身 release]
-    I --> J[值: 0 → 删除]
+    A[Initial value: 2] --> B[register]
+    B --> C[release after init completes]
+    C --> D[Value: 1]
+    D --> E[Another service grabs]
+    E --> F[Value: 2]
+    F --> G[Another service releases]
+    G --> H[Value: 1]
+    H --> I[It releases itself]
+    I --> J[Value: 0 → delete]
 ```
 
-### 3. 引用管理 - skynet_context_grab()
+### 3. Reference Management - skynet_context_grab()
 
 ```c
 void
@@ -202,19 +202,19 @@ skynet_context_grab(struct skynet_context *ctx) {
 void
 skynet_context_reserve(struct skynet_context *ctx) {
     skynet_context_grab(ctx);
-    // 不计入总数，因为 reserved context 会在最后释放
+    // Not counted in the total, because the reserved context is released at the end
     context_dec();
 }
 ```
 
-## 消息处理
+## Message Handling
 
-### 1. 发送消息 - skynet_send()
+### 1. Sending a Message - skynet_send()
 
 ```c
 int
 skynet_send(struct skynet_context * context, uint32_t source, uint32_t destination, int type, int session, void * data, size_t sz) {
-    // 检查消息类型标志
+    // Check the message type flags
     if ((sz & MESSAGE_TYPE_MASK) != sz) {
         skynet_error(context, "The message to %x is too large", destination);
         if (type & PTYPE_TAG_DONTCOPY) {
@@ -222,15 +222,15 @@ skynet_send(struct skynet_context * context, uint32_t source, uint32_t destinati
         }
         return -2;
     }
-    
-    // 检查是否是本地消息
+
+    // Check whether it is a local message
     if (source == 0) {
         source = context->handle;
     }
-    
-    // 检查是否需要释放
+
+    // Check whether release is needed
     if (skynet_harbor_message_isremote(destination)) {
-        // 远程消息，通过 Harbor 发送
+        // Remote message, send it through Harbor
         struct skynet_message smsg;
         smsg.source = source;
         smsg.session = session;
@@ -238,7 +238,7 @@ skynet_send(struct skynet_context * context, uint32_t source, uint32_t destinati
         smsg.sz = sz;
         skynet_harbor_send(&smsg, destination);
     } else {
-        // 本地消息，直接推入队列
+        // Local message, push it directly into the queue
         struct skynet_message smsg;
         smsg.source = source;
         smsg.session = session;
@@ -246,166 +246,166 @@ skynet_send(struct skynet_context * context, uint32_t source, uint32_t destinati
         smsg.sz = sz;
         skynet_context_push(destination, &smsg);
     }
-    
+
     return session;
 }
 ```
 
-**消息发送流程**：
+**Message sending flow**:
 
 ```mermaid
 graph TB
-    Start[skynet_send<br/>ctx, source, dest, type, session, data, sz] --> A[检查消息大小]
-    A --> B[设置源地址<br/>source = context->handle]
-    B --> C{消息类型}
-    
-    C -->|远程消息| D[Harbor 发送<br/>skynet_harbor_send]
-    C -->|本地消息| E[直接入队<br/>skynet_context_push]
+    Start[skynet_send<br/>ctx, source, dest, type, session, data, sz] --> A[Check the message size]
+    A --> B[Set the source address<br/>source = context->handle]
+    B --> C{Message type}
+
+    C -->|Remote message| D[Send via Harbor<br/>skynet_harbor_send]
+    C -->|Local message| E[Enqueue directly<br/>skynet_context_push]
 ```
 
-### 2. 消息推入队列 - skynet_context_push()
+### 2. Pushing a Message into the Queue - skynet_context_push()
 
 ```c
 int
 skynet_context_push(uint32_t handle, struct skynet_message *message) {
-    // 获取服务上下文
+    // Get the service context
     struct skynet_context * ctx = skynet_handle_grab(handle);
     if (ctx == NULL) {
         return -1;
     }
-    
-    // 推入消息队列
+
+    // Push into the message queue
     skynet_mq_push(ctx->queue, message);
-    
-    // 释放上下文引用
+
+    // Release the context reference
     skynet_context_release(ctx);
-    
+
     return 0;
 }
 ```
 
-### 3. 消息分发 - skynet_context_message_dispatch()
+### 3. Dispatching Messages - skynet_context_message_dispatch()
 
 ```c
-struct skynet_message * 
+struct skynet_message *
 skynet_context_message_dispatch(struct skynet_monitor *sm, struct skynet_message *msg, int weight) {
-    // 检查是否是退出消息
+    // Check whether it is an exit message
     if (msg->source == 0) {
-        // 系统消息
+        // System message
         if (msg->session == 0) {
-            // 退出消息
+            // Exit message
             skynet_handle_retire(msg->destination);
             return NULL;
         }
     }
-    
-    // 获取目标服务
+
+    // Get the target service
     struct skynet_context * ctx = skynet_handle_grab(msg->destination);
     if (ctx == NULL) {
-        // 目标服务不存在，丢弃消息
+        // The target service does not exist, drop the message
         skynet_free(msg->data);
         return NULL;
     }
-    
-    // 检查是否是死循环服务
+
+    // Check whether it is an endless-loop service
     if (ctx->endless) {
-        // 死循环服务，不处理消息
+        // Endless-loop service, do not process the message
         skynet_free(msg->data);
         skynet_context_release(ctx);
         return NULL;
     }
-    
-    // 开始处理消息
+
+    // Start processing the message
     int type = msg->sz >> MESSAGE_TYPE_SHIFT;
     size_t sz = msg->sz & MESSAGE_TYPE_MASK;
-    
-    // 性能监控
+
+    // Performance monitoring
     if (ctx->profile) {
         ctx->cpu_start = skynet_thread_time();
     }
-    
-    // 调用回调函数
+
+    // Call the callback function
     CHECKCALLING_BEGIN(ctx)
     int err = ctx->cb(ctx, ctx->cb_ud, type, msg->session, msg->source, msg->data, sz);
     CHECKCALLING_END(ctx)
-    
-    // 更新性能统计
+
+    // Update the performance statistics
     if (ctx->profile) {
         ctx->cpu_cost += skynet_thread_time() - ctx->cpu_start;
     }
-    
-    // 更新消息计数
+
+    // Update the message count
     ++ctx->message_count;
-    
-    // 释放上下文引用
+
+    // Release the context reference
     skynet_context_release(ctx);
-    
+
     return NULL;
 }
 ```
 
-## 回调函数管理
+## Callback Function Management
 
-### 设置回调函数 - skynet_callback()
+### Setting the Callback Function - skynet_callback()
 
 ```c
 void
 skynet_callback(struct skynet_context * context, void *ud, skynet_cb cb) {
-    // 设置用户数据
+    // Set the user data
     context->cb_ud = ud;
-    
-    // 设置回调函数
+
+    // Set the callback function
     context->cb = cb;
 }
 ```
 
-**回调函数类型**：
+**Callback function type**:
 
 ```c
 typedef int (*skynet_cb)(
-    struct skynet_context * ctx,   // 服务上下文
-    void * ud,                      // 用户数据
-    int type,                       // 消息类型
-    int session,                    // 会话 ID
-    uint32_t source,               // 消息来源
-    const void * msg,              // 消息内容
-    size_t sz                      // 消息大小
+    struct skynet_context * ctx,   // service context
+    void * ud,                      // user data
+    int type,                       // message type
+    int session,                    // session ID
+    uint32_t source,               // message source
+    const void * msg,              // message content
+    size_t sz                      // message size
 );
 ```
 
-## 服务查询
+## Service Lookup
 
-### 按句柄查询 - skynet_handle_grab()
+### Lookup by Handle - skynet_handle_grab()
 
 ```c
-// 在 skynet_handle.c 中实现
-struct skynet_context * 
+// Implemented in skynet_handle.c
+struct skynet_context *
 skynet_handle_grab(uint32_t handle) {
     struct handle_storage *s = H;
     rwlock_rlock(&s->lock);
-    
+
     struct skynet_context *result = NULL;
     int index = handle & (s->slot_size - 1);
     struct skynet_context *ctx = s->slot[index];
-    
+
     if (ctx && ctx->handle == handle) {
         result = ctx;
         skynet_context_grab(result);
     }
-    
+
     rwlock_runlock(&s->lock);
     return result;
 }
 ```
 
-### 按名称查询 - skynet_handle_findname()
+### Lookup by Name - skynet_handle_findname()
 
 ```c
 uint32_t
 skynet_handle_findname(const char * name) {
     struct handle_storage *s = H;
     rwlock_rlock(&s->lock);
-    
+
     uint32_t handle = 0;
     int i;
     for (i=0; i<s->name_count; i++) {
@@ -414,15 +414,15 @@ skynet_handle_findname(const char * name) {
             break;
         }
     }
-    
+
     rwlock_runlock(&s->lock);
     return handle;
 }
 ```
 
-## 死循环检测
+## Endless Loop Detection
 
-### 标记死循环 - skynet_context_endless()
+### Marking an Endless Loop - skynet_context_endless()
 
 ```c
 void
@@ -436,29 +436,29 @@ skynet_context_endless(uint32_t handle) {
 }
 ```
 
-### 检查死循环
+### Checking for Endless Loops
 
 ```c
-// 在消息分发中检查
+// Checked during message dispatch
 if (ctx->endless) {
-    // 死循环服务，不处理消息
+    // Endless-loop service, do not process the message
     skynet_free(msg->data);
     skynet_context_release(ctx);
     return NULL;
 }
 ```
 
-## 性能监控
+## Performance Monitoring
 
-### CPU 消耗统计
+### CPU Cost Statistics
 
 ```c
-// 在消息处理前后统计
+// Measured before and after message processing
 if (ctx->profile) {
     ctx->cpu_start = skynet_thread_time();
 }
 
-// 调用回调函数
+// Call the callback function
 int err = ctx->cb(ctx, ctx->cb_ud, type, msg->session, msg->source, msg->data, sz);
 
 if (ctx->profile) {
@@ -468,20 +468,20 @@ if (ctx->profile) {
 ++ctx->message_count;
 ```
 
-### 获取性能数据
+### Getting Performance Data
 
 ```c
-// 在 skynet_monitor.c 中实现
+// Implemented in skynet_monitor.c
 void
 skynet_monitor_check(struct skynet_monitor *sm) {
-    // 检查各个服务的 CPU 消耗
+    // Check the CPU cost of each service
     // ...
 }
 ```
 
-## 错误处理
+## Error Handling
 
-### 消息丢弃处理
+### Handling Dropped Messages
 
 ```c
 struct drop_t {
@@ -491,29 +491,29 @@ struct drop_t {
 static void
 drop_message(struct skynet_message *msg, void *ud) {
     struct drop_t *d = ud;
-    
-    // 释放消息数据
+
+    // Free the message data
     skynet_free(msg->data);
-    
-    // 向消息源发送错误通知
+
+    // Send an error notification to the message source
     uint32_t source = d->handle;
     assert(source);
     skynet_send(NULL, source, msg->source, PTYPE_ERROR, msg->session, NULL, 0);
 }
 ```
 
-### 创建失败处理
+### Handling Creation Failures
 
 ```c
 if (r == 0) {
-    // 初始化成功
+    // Initialization succeeded
     ctx->init = true;
     skynet_globalmq_push(queue);
     skynet_error(ctx, "LAUNCH %s %s", name, param ? param : "");
     skynet_context_release(ctx);
     return handle;
 } else {
-    // 初始化失败
+    // Initialization failed
     skynet_error(ctx, "error: launch %s FAILED", name);
     uint32_t handle = ctx->handle;
     skynet_context_release(ctx);
@@ -524,20 +524,20 @@ if (r == 0) {
 }
 ```
 
-## 线程安全
+## Thread Safety
 
-### 原子操作
+### Atomic Operations
 
 ```c
-// 引用计数使用原子操作
+// The reference count uses atomic operations
 ATOM_INT ref;
 
-// 增加引用
+// Increment the reference
 void skynet_context_grab(struct skynet_context *ctx) {
     ATOM_FINC(&ctx->ref);
 }
 
-// 减少引用
+// Decrement the reference
 void skynet_context_release(struct skynet_context *ctx) {
     if (ATOM_FDEC(&ctx->ref) == 1) {
         delete_context(ctx);
@@ -545,55 +545,55 @@ void skynet_context_release(struct skynet_context *ctx) {
 }
 ```
 
-### 读写锁
+### Read-Write Lock
 
 ```c
-// 句柄表使用读写锁保护
-rwlock_rlock(&s->lock);   // 读操作
+// The handle table is protected by a read-write lock
+rwlock_rlock(&s->lock);   // read operation
 rwlock_runlock(&s->lock);
-rwlock_wlock(&s->lock);   // 写操作
+rwlock_wlock(&s->lock);   // write operation
 rwlock_wunlock(&s->lock);
 ```
 
-## 设计模式
+## Design Patterns
 
-### 1. 引用计数模式
+### 1. Reference Counting Pattern
 
 ```c
-// 生命周期管理
+// Lifecycle management
 struct skynet_context *ctx = skynet_handle_grab(handle);
 if (ctx) {
-    // 使用 ctx
+    // Use ctx
     skynet_context_release(ctx);
 }
 ```
 
-### 2. 回调函数模式
+### 2. Callback Function Pattern
 
 ```c
-// 注册回调
+// Register the callback
 skynet_callback(context, ud, callback_function);
 
-// 调用回调
+// Call the callback
 ctx->cb(ctx, ctx->cb_ud, type, session, source, data, sz);
 ```
 
-### 3. 生产者-消费者模式
+### 3. Producer-Consumer Pattern
 
 ```c
-// 生产者：发送消息
+// Producer: send a message
 skynet_send(context, source, dest, type, session, data, sz);
 
-// 消费者：处理消息
+// Consumer: process the message
 skynet_context_message_dispatch(sm, msg, weight);
 ```
 
-## 性能优化
+## Performance Optimizations
 
-### 1. 批量处理
+### 1. Batch Processing
 
 ```c
-// 一次处理多个消息
+// Process multiple messages at once
 for (i = 0; i < n; i++) {
     struct skynet_message *msg = skynet_mq_pop(q);
     if (msg) {
@@ -602,80 +602,80 @@ for (i = 0; i < n; i++) {
 }
 ```
 
-### 2. 权重调度
+### 2. Weighted Scheduling
 
 ```c
-// 根据权重决定处理消息数量
+// Decide how many messages to process based on the weight
 int weight = skynet_mq_length(q) / global_mq_count;
 if (weight == 0) weight = 1;
 ```
 
-## 与其他模块的交互
+## Interaction with Other Modules
 
-### 与 skynet_mq.c 的交互
+### Interaction with skynet_mq.c
 
 ```c
-// 创建消息队列
+// Create the message queue
 ctx->queue = skynet_mq_create(handle);
 
-// 推入消息
+// Push a message
 skynet_mq_push(ctx->queue, message);
 
-// 弹出消息
+// Pop a message
 struct skynet_message *msg = skynet_mq_pop(ctx->queue);
 ```
 
-### 与 skynet_handle.c 的交互
+### Interaction with skynet_handle.c
 
 ```c
-// 注册句柄
+// Register the handle
 ctx->handle = skynet_handle_register(ctx);
 
-// 查找服务
+// Look up a service
 struct skynet_context *ctx = skynet_handle_grab(handle);
 
-// 注销句柄
+// Retire the handle
 skynet_handle_retire(handle);
 ```
 
-### 与 skynet_module.c 的交互
+### Interaction with skynet_module.c
 
 ```c
-// 查询模块
+// Query the module
 struct skynet_module *mod = skynet_module_query(name);
 
-// 创建实例
+// Create the instance
 void *inst = skynet_module_instance_create(mod);
 
-// 初始化实例
+// Initialize the instance
 int r = skynet_module_instance_init(mod, inst, ctx, param);
 
-// 释放实例
+// Release the instance
 skynet_module_instance_release(ctx->mod, ctx->instance);
 ```
 
-## 关键设计决策
+## Key Design Decisions
 
-### 1. 为什么使用引用计数？
+### 1. Why use reference counting?
 
-- **线程安全**：原子操作保证线程安全
-- **自动释放**：引用计数为 0 时自动释放资源
-- **避免循环引用**：通过设计避免循环引用
+- **Thread safety**: atomic operations guarantee thread safety
+- **Automatic release**: resources are released automatically when the reference count reaches 0
+- **No circular references**: circular references are avoided through design
 
-### 2. 为什么使用回调函数？
+### 2. Why use callback functions?
 
-- **解耦**：服务逻辑与框架解耦
-- **灵活性**：可以动态设置回调函数
-- **多态性**：不同类型的服务可以有不同的回调
+- **Decoupling**: service logic is decoupled from the framework
+- **Flexibility**: the callback function can be set dynamically
+- **Polymorphism**: different types of services can have different callbacks
 
-### 3. 为什么每个服务有独立的消息队列？
+### 3. Why does each service have its own message queue?
 
-- **隔离性**：服务之间互不干扰
-- **公平调度**：每个服务公平地获得处理机会
-- **简化设计**：避免复杂的锁竞争
+- **Isolation**: services do not interfere with each other
+- **Fair scheduling**: every service gets a fair chance to be processed
+- **Simple design**: complex lock contention is avoided
 
-## 下一步
+## Next Steps
 
-- [skynet_mq.c 分析](/analysis/skynet-mq) - 消息队列的实现细节
-- [skynet_handle.c 分析](/analysis/skynet-handle) - 句柄管理的实现
-- [服务调度](/architecture/service-scheduling) - 理解工作线程如何调度服务
+- [Analysis of skynet_mq.c](/analysis/skynet-mq) - implementation details of the message queue
+- [Analysis of skynet_handle.c](/analysis/skynet-handle) - implementation of handle management
+- [Service Scheduling](/architecture/service-scheduling) - understand how worker threads schedule services

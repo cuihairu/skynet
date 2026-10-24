@@ -1,238 +1,238 @@
-# 核心模块概览
+# Core Modules Overview
 
-Skynet 的核心由 C 语言实现。在阅读源码的过程中，我们整理了各个模块的职责和依赖关系，方便理解整体架构。
+The core of Skynet is implemented in C. While reading the source code, we organized the responsibilities and dependencies of each module to make the overall architecture easier to understand.
 
-## 模块依赖关系
+## Module Dependencies
 
 ```mermaid
 graph TB
-    Start[skynet_start.c<br/>系统初始化入口]
-    
-    Start --> Server[skynet_server.c<br/>服务管理]
-    Start --> Timer[skynet_timer.c<br/>定时器]
-    Start --> Harbor[skynet_harbor.c<br/>集群]
-    
-    Server --> MQ[skynet_mq.c<br/>消息队列]
-    Server --> Handle[skynet_handle.c<br/>服务句柄]
-    Server --> Module[skynet_module.c<br/>动态模块]
-    
-    MQ --> Socket[socket_server.c<br/>网络 I/O 抽象层]
+    Start[skynet_start.c<br/>System initialization entry]
+
+    Start --> Server[skynet_server.c<br/>Service management]
+    Start --> Timer[skynet_timer.c<br/>Timer]
+    Start --> Harbor[skynet_harbor.c<br/>Cluster]
+
+    Server --> MQ[skynet_mq.c<br/>Message queue]
+    Server --> Handle[skynet_handle.c<br/>Service handles]
+    Server --> Module[skynet_module.c<br/>Dynamic modules]
+
+    MQ --> Socket[socket_server.c<br/>Network I/O abstraction layer]
     Handle --> Socket
     Module --> Socket
-    
+
     Timer --> Socket
     Harbor --> Socket
 ```
 
-## 核心模块列表
+## Core Module List
 
-### 1. skynet_start.c - 系统启动
+### 1. skynet_start.c - System Startup
 
-**职责**：初始化整个 Skynet 系统
+**Responsibility**: initialize the entire Skynet system
 
-**核心函数**：
-- `skynet_start()`：系统入口点
-- `start_thread()`：创建工作线程
-- `thread_worker()`：工作线程主循环
+**Key functions**:
+- `skynet_start()`: system entry point
+- `start_thread()`: create worker threads
+- `thread_worker()`: worker thread main loop
 
-**启动流程**：
-1. 解析配置
-2. 初始化各子系统
-3. 创建工作线程
-4. 加载启动服务
-5. 进入主循环
+**Startup flow**:
+1. Parse the configuration
+2. Initialize each subsystem
+3. Create worker threads
+4. Load the bootstrap service
+5. Enter the main loop
 
-### 2. skynet_server.c - 服务管理
+### 2. skynet_server.c - Service Management
 
-**职责**：服务的创建、销毁、消息处理
+**Responsibility**: service creation, destruction, and message handling
 
-**核心数据结构**：
+**Core data structures**:
 ```c
 struct skynet_context {
-    void *instance;           // 服务实例
-    struct skynet_module *mod; // 模块指针
-    void *cb_ud;              // 回调用户数据
-    skynet_cb cb;             // 消息回调函数
-    struct message_queue *queue; // 消息队列
-    char result[32];          // 结果缓冲区
-    uint32_t handle;          // 服务句柄
-    int session_id;           // 会话 ID
-    int ref;                  // 引用计数
-    char *name;               // 服务名称
+    void *instance;           // service instance
+    struct skynet_module *mod; // module pointer
+    void *cb_ud;              // callback user data
+    skynet_cb cb;             // message callback function
+    struct message_queue *queue; // message queue
+    char result[32];          // result buffer
+    uint32_t handle;          // service handle
+    int session_id;           // session ID
+    int ref;                  // reference count
+    char *name;               // service name
 };
 ```
 
-**核心函数**：
-- `skynet_context_new()`：创建新服务
-- `skynet_context_grab()`：增加引用
-- `skynet_context_release()`：减少引用
-- `skynet_send()`：发送消息
-- `skynet_callback()`：设置回调函数
+**Key functions**:
+- `skynet_context_new()`: create a new service
+- `skynet_context_grab()`: increment the reference count
+- `skynet_context_release()`: decrement the reference count
+- `skynet_send()`: send a message
+- `skynet_callback()`: set the callback function
 
-### 3. skynet_mq.c - 消息队列
+### 3. skynet_mq.c - Message Queue
 
-**职责**：管理服务的消息队列
+**Responsibility**: manage the message queues of services
 
-**核心数据结构**：
+**Core data structures**:
 ```c
 struct message_queue {
-    struct spinlock lock;     // 自旋锁
-    uint32_t handle;          // 所属服务句柄
-    int cap;                  // 队列容量
-    int head;                 // 队列头
-    int tail;                 // 队列尾
-    int in_global;           // 是否在全局队列中
-    struct skynet_message *queue; // 消息数组
+    struct spinlock lock;     // spinlock
+    uint32_t handle;          // handle of the owning service
+    int cap;                  // queue capacity
+    int head;                 // queue head
+    int tail;                 // queue tail
+    int in_global;           // whether it is in the global queue
+    struct skynet_message *queue; // message array
 };
 ```
 
-**核心函数**：
-- `skynet_mq_create()`：创建消息队列
-- `skynet_mq_push()`：消息入队
-- `skynet_mq_pop()`：消息出队
-- `skynet_mq_mark_release()`：标记队列为释放状态
+**Key functions**:
+- `skynet_mq_create()`: create a message queue
+- `skynet_mq_push()`: enqueue a message
+- `skynet_mq_pop()`: dequeue a message
+- `skynet_mq_mark_release()`: mark the queue for release
 
-**全局队列**：
+**Global queue**:
 ```c
 struct global_queue {
-    struct message_queue *head; // 队列链表头
-    struct message_queue *tail; // 队列链表尾
-    struct spinlock lock;       // 自旋锁
+    struct message_queue *head; // head of the queue linked list
+    struct message_queue *tail; // tail of the queue linked list
+    struct spinlock lock;       // spinlock
 };
 ```
 
-### 4. skynet_handle.c - 服务句柄
+### 4. skynet_handle.c - Service Handles
 
-**职责**：管理服务的句柄映射
+**Responsibility**: manage the mapping of service handles
 
-**核心数据结构**：
+**Core data structures**:
 ```c
 struct handle_storage {
-    struct rwlock lock;        // 读写锁
+    struct rwlock lock;        // read-write lock
     uint32_t harbor;          // Harbor ID
-    int slot_size;            // 槽位大小
-    struct skynet_context **slot; // 服务数组
+    int slot_size;            // slot size
+    struct skynet_context **slot; // service array
 };
 ```
 
-**核心函数**：
-- `skynet_handle_register()`：注册服务
-- `skynet_handle_retire()`：注销服务
-- `skynet_handle_grab()`：获取服务
-- `skynet_handle_findname()`：按名称查找
+**Key functions**:
+- `skynet_handle_register()`: register a service
+- `skynet_handle_retire()`: retire a service
+- `skynet_handle_grab()`: grab a service
+- `skynet_handle_findname()`: look up a service by name
 
-### 5. skynet_module.c - 动态模块
+### 5. skynet_module.c - Dynamic Modules
 
-**职责**：加载和管理 C 服务模块
+**Responsibility**: load and manage C service modules
 
-**模块接口**：
+**Module interface**:
 ```c
 struct skynet_module {
-    const char *name;         // 模块名称
-    void *module;             // 动态库句柄
-    void *(*init)(const char *args); // 初始化函数
-    void (*release)(void *inst);     // 释放函数
-    void (*signal)(void *inst, int signal); // 信号处理
+    const char *name;         // module name
+    void *module;             // dynamic library handle
+    void (*init)(const char *args); // initialization function
+    void (*release)(void *inst);     // release function
+    void (*signal)(void *inst, int signal); // signal handling
 };
 ```
 
-**核心函数**：
-- `skynet_module_create()`：创建模块实例
-- `skynet_module_instance_release()`：释放模块实例
-- `skynet_module_query()`：查询模块
+**Key functions**:
+- `skynet_module_create()`: create a module instance
+- `skynet_module_instance_release()`: release a module instance
+- `skynet_module_query()`: query a module
 
-### 6. skynet_timer.c - 定时器
+### 6. skynet_timer.c - Timer
 
-**职责**：提供定时器功能
+**Responsibility**: provide timer functionality
 
-**核心数据结构**：
+**Core data structures**:
 ```c
 struct timer {
-    struct link_list near[4][64]; // 近期定时器（时间轮）
-    struct link_list far[4][64];  // 远期定时器
-    struct spinlock lock;         // 自旋锁
-    uint32_t time;               // 当前时间
-    uint32_t starttime;          // 启动时间
-    uint64_t current;            // 当前时间戳
-    uint64_t current_point;      // 当前时间点
+    struct link_list near[4][64]; // near-term timers (timing wheel)
+    struct link_list far[4][64];  // far-term timers
+    struct spinlock lock;         // spinlock
+    uint32_t time;               // current time
+    uint32_t starttime;          // start time
+    uint64_t current;            // current timestamp
+    uint64_t current_point;      // current time point
 };
 ```
 
-**核心函数**：
-- `skynet_timer_init()`：初始化定时器
-- `skynet_timer_timeout()`：设置超时
-- `skynet_timer_update()`：更新定时器
+**Key functions**:
+- `skynet_timer_init()`: initialize the timer
+- `skynet_timer_timeout()`: set a timeout
+- `skynet_timer_update()`: update the timer
 
-### 7. socket_server.c - 网络 I/O
+### 7. socket_server.c - Network I/O
 
-**职责**：提供统一的网络 I/O 抽象
+**Responsibility**: provide a unified network I/O abstraction
 
-**核心数据结构**：
+**Core data structures**:
 ```c
 struct socket {
-    int fd;                    // 文件描述符
+    int fd;                    // file descriptor
     int id;                    // socket ID
-    int type;                  // socket 类型
-    int size;                  // 缓冲区大小
-    struct wb_list high;       // 高优先级写缓冲
-    struct wb_list low;        // 低优先级写缓冲
-    int stat;                  // 状态
-    int64_t wb_size;           // 写缓冲大小
-    uint32_t watching;         // 监控标志
-    void *p;                   // 用户数据
+    int type;                  // socket type
+    int size;                  // buffer size
+    struct wb_list high;       // high-priority write buffer
+    struct wb_list low;        // low-priority write buffer
+    int stat;                  // status
+    int64_t wb_size;           // write buffer size
+    uint32_t watching;         // monitoring flags
+    void *p;                   // user data
 };
 ```
 
-**核心函数**：
-- `socket_server_create()`：创建 socket 服务器
-- `socket_server_listen()`：监听连接
-- `socket_server_send()`：发送数据
-- `socket_server_poll()`：轮询事件
+**Key functions**:
+- `socket_server_create()`: create the socket server
+- `socket_server_listen()`: listen for connections
+- `socket_server_send()`: send data
+- `socket_server_poll()`: poll for events
 
-### 8. skynet_harbor.c - 集群
+### 8. skynet_harbor.c - Cluster
 
-**职责**：支持跨节点服务调用
+**Responsibility**: support cross-node service calls
 
-**核心函数**：
-- `skynet_harbor_start()`：启动 Harbor
-- `skynet_harbor_send()`：发送跨节点消息
-- `skynet_harbor_register()`：注册全局服务
+**Key functions**:
+- `skynet_harbor_start()`: start Harbor
+- `skynet_harbor_send()`: send a cross-node message
+- `skynet_harbor_register()`: register a global service
 
-### 9. skynet_daemon.c - 守护进程
+### 9. skynet_daemon.c - Daemon
 
-**职责**：将 Skynet 作为守护进程运行
+**Responsibility**: run Skynet as a daemon
 
-**核心函数**：
-- `daemon_init()`：初始化守护进程
-- `daemon_exit()`：退出守护进程
+**Key functions**:
+- `daemon_init()`: initialize the daemon
+- `daemon_exit()`: exit the daemon
 
-### 10. skynet_log.c - 日志
+### 10. skynet_log.c - Logging
 
-**职责**：日志记录
+**Responsibility**: log recording
 
-**核心函数**：
-- `skynet_error()`：记录错误日志
-- `skynet_log_init()`：初始化日志系统
+**Key functions**:
+- `skynet_error()`: log an error message
+- `skynet_log_init()`: initialize the logging system
 
-## 模块间通信
+## Inter-Module Communication
 
-### 消息传递流程
+### Message Passing Flow
 
 ```mermaid
 graph TB
-    subgraph 服务层
-        SA[服务 A]
-        SB[服务 B]
+    subgraph "Service Layer"
+        SA[Service A]
+        SB[Service B]
     end
 
-    subgraph 消息队列层
-        MQA[消息队列 A]
-        MQB[消息队列 B]
+    subgraph "Message Queue Layer"
+        MQA[Message Queue A]
+        MQB[Message Queue B]
     end
 
-    subgraph 全局调度层
-        GQ[全局消息队列]
-        W[Worker 线程]
+    subgraph "Global Scheduling Layer"
+        GQ[Global Message Queue]
+        W[Worker Thread]
     end
 
     SA -->|skynet_send| MQA
@@ -244,88 +244,88 @@ graph TB
     W -->|dispatch| SB
 ```
 
-**经验总结**：
-- 每个服务有独立的消息队列，避免锁竞争
-- 全局队列负责调度，保证公平性
-- Worker 线程从全局队列取服务队列，处理其中的消息
+**Summary of experience**:
+- Each service has its own message queue, which avoids lock contention
+- The global queue handles scheduling and guarantees fairness
+- Worker threads take a service queue out of the global queue and process the messages inside it
 
-### 跨节点通信
+### Cross-Node Communication
 
 ```mermaid
 graph LR
-    subgraph 节点 A
-        HA[Harbor 服务]
-        SA1[服务 1]
-        SA2[服务 2]
+    subgraph "Node A"
+        HA[Harbor Service]
+        SA1[Service 1]
+        SA2[Service 2]
     end
 
-    subgraph 节点 B
-        HB[Harbor 服务]
-        SB1[服务 3]
-        SB2[服务 4]
+    subgraph "Node B"
+        HB[Harbor Service]
+        SB1[Service 3]
+        SB2[Service 4]
     end
 
-    HA <-->|TCP 连接| HB
+    HA <-->|TCP connection| HB
     SA1 --> HA
     SA2 --> HA
     SB1 --> HB
     SB2 --> HB
 ```
 
-**经验总结**：
-- Harbor 服务负责跨节点消息转发
-- 节点间通过 TCP 连接通信
-- 本地服务不需要知道目标服务在哪个节点
+**Summary of experience**:
+- The Harbor service is responsible for forwarding messages across nodes
+- Nodes communicate with each other over TCP connections
+- A local service does not need to know which node the target service lives on
 
-## 关键设计模式
+## Key Design Patterns
 
-### 1. 引用计数
-服务使用引用计数管理生命周期：
+### 1. Reference Counting
+Services use reference counting to manage their lifecycle:
 ```c
-// 增加引用
+// Increment the reference count
 skynet_context_grab(ctx);
 
-// 减少引用
+// Decrement the reference count
 skynet_context_release(ctx);
 ```
 
-### 2. 自旋锁
-消息队列使用自旋锁保护：
+### 2. Spinlock
+Message queues are protected with spinlocks:
 ```c
 spinlock_lock(&q->lock);
-// 临界区操作
+// Critical section operations
 spinlock_unlock(&q->lock);
 ```
 
-### 3. 读写锁
-服务句柄表使用读写锁：
+### 3. Read-Write Lock
+The service handle table uses a read-write lock:
 ```c
-// 读操作
+// Read operation
 rwlock_rlock(&s->lock);
-// 读取操作
+// Perform the read
 rwlock_runlock(&s->lock);
 
-// 写操作
+// Write operation
 rwlock_wlock(&s->lock);
-// 写入操作
+// Perform the write
 rwlock_wunlock(&s->lock);
 ```
 
-### 4. 回调函数
-服务通过回调函数处理消息：
+### 4. Callback Function
+Services handle messages through callback functions:
 ```c
-typedef int (*skynet_cb)(struct skynet_context *ctx, 
-    void *ud, 
-    int type, 
-    int session, 
-    uint32_t source, 
-    const void *msg, 
+typedef int (*skynet_cb)(struct skynet_context *ctx,
+    void *ud,
+    int type,
+    int session,
+    uint32_t source,
+    const void *msg,
     size_t sz);
 ```
 
-## 下一步
+## Next Steps
 
-- [skynet_server.c 详解](/analysis/skynet-server) - 深入理解服务管理
-- [skynet_mq.c 详解](/analysis/skynet-mq) - 消息队列的实现细节
-- [skynet_timer.c 详解](/analysis/skynet-timer) - 定时器的实现原理
-- [socket_server.c 详解](/analysis/socket-server) - 网络 I/O 的实现
+- [Detailed analysis of skynet_server.c](/analysis/skynet-server) - a deep dive into service management
+- [Detailed analysis of skynet_mq.c](/analysis/skynet-mq) - implementation details of the message queue
+- [Detailed analysis of skynet_timer.c](/analysis/skynet-timer) - how the timer works
+- [Detailed analysis of socket_server.c](/analysis/socket-server) - implementation of network I/O

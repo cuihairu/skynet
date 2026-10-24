@@ -1,160 +1,160 @@
-# 服务与模块
+# Services and Modules
 
-服务是 Skynet 中的核心概念，每个服务都是一个独立的 Actor。在实际项目中，我们发现理解服务的创建和管理是正确使用 Skynet 的关键。
+Services are a core concept in Skynet, and each service is an independent Actor. In real projects, we have found that understanding how services are created and managed is the key to using Skynet correctly.
 
-## 服务的概念
+## The Concept of Services
 
-### 什么是服务
+### What Is a Service
 
-在 Skynet 中，**服务 (Service)** 是：
-- 一个独立的执行单元，拥有自己的生命周期
-- 拥有自己的消息队列，通过消息与其他服务交互
-- 可以处理消息并发送消息，实现业务逻辑
-- 通过回调函数定义行为，支持动态替换
+In Skynet, a **Service** is:
+- An independent execution unit with its own lifecycle
+- Has its own message queue and interacts with other services through messages
+- Can process messages and send messages, implementing business logic
+- Defines behavior through callback functions and supports dynamic replacement
 
-### 服务 vs 线程
+### Service vs Thread
 
 ```mermaid
 graph TB
-    subgraph 传统多线程
-        T1[线程 1<br/>共享内存]
-        T2[线程 2<br/>共享内存]
-        T3[线程 3<br/>共享内存]
+    subgraph Traditional Multithreading
+        T1[Thread 1<br/>Shared memory]
+        T2[Thread 2<br/>Shared memory]
+        T3[Thread 3<br/>Shared memory]
     end
     
-    subgraph Skynet 服务
-        S1[服务 1<br/>独立内存]
-        S2[服务 2<br/>独立内存]
-        S3[服务 3<br/>独立内存]
+    subgraph Skynet Services
+        S1[Service 1<br/>Independent memory]
+        S2[Service 2<br/>Independent memory]
+        S3[Service 3<br/>Independent memory]
         
-        S1 -->|消息传递| S2
-        S2 -->|消息传递| S3
-        S3 -->|消息传递| S1
+        S1 -->|Message passing| S2
+        S2 -->|Message passing| S3
+        S3 -->|Message passing| S1
     end
 ```
 
-## 服务类型
+## Service Types
 
-### 1. C 服务
+### 1. C Services
 
-用 C 语言实现的服务，性能高，适合底层功能：
+Services implemented in the C language offer high performance and are suitable for low-level functionality:
 
 ```c
-// C 服务接口
+// C service interface
 struct skynet_module {
     const char *name;
     void *module;
-    void *(*init)(const char *args);      // 初始化
-    void (*release)(void *inst);          // 释放
-    void (*signal)(void *inst, int signal); // 信号处理
+    void *(*init)(const char *args);      // Initialization
+    void (*release)(void *inst);          // Release
+    void (*signal)(void *inst, int signal); // Signal handling
 };
 ```
 
-**示例**：logger、harbor、gate 等
+**Examples**: logger, harbor, gate, and others
 
-### 2. Lua 服务
+### 2. Lua Services
 
-用 Lua 实现的服务，开发效率高，支持热更新：
+Services implemented in Lua have high development efficiency and support hot updates:
 
 ```lua
--- Lua 服务模板
+-- Lua service template
 local skynet = require "skynet"
 
 skynet.start(function()
-    -- 初始化代码
+    -- Initialization code
     
     skynet.dispatch("lua", function(session, address, cmd, ...)
-        -- 消息处理逻辑
+        -- Message handling logic
     end)
 end)
 ```
 
-**示例**：游戏逻辑、业务处理等
+**Examples**: game logic, business processing, and others
 
-## 服务生命周期
+## Service Lifecycle
 
-### 状态转换
+### State Transitions
 
 ```mermaid
 stateDiagram-v2
-    [*] --> 不存在
-    不存在 --> 初始化: 创建服务
-    初始化 --> 运行中: 初始化完成
-    运行中 --> 挂起: 挂起
-    挂起 --> 运行中: 恢复
-    运行中 --> 销毁: 服务退出
-    销毁 --> [*]
+    [*] --> NotExist
+    NotExist --> Initializing: Create service
+    Initializing --> Running: Initialization complete
+    Running --> Suspended: Suspend
+    Suspended --> Running: Resume
+    Running --> Destroyed: Service exits
+    Destroyed --> [*]
 ```
 
-### 服务创建
+### Service Creation
 
 ```c
-// skynet_server.c 中的服务创建
+// Service creation in skynet_server.c
 
 struct skynet_context * skynet_context_new(const char *name, const char *param) {
-    // 1. 加载模块
+    // 1. Load the module
     struct skynet_module *mod = skynet_module_query(name);
     
-    // 2. 创建实例
+    // 2. Create the instance
     void *inst = skynet_module_instance_create(mod, param);
     
-    // 3. 创建上下文
+    // 3. Create the context
     struct skynet_context *ctx = skynet_malloc(sizeof(*ctx));
     ctx->mod = mod;
     ctx->instance = inst;
     
-    // 4. 创建消息队列
+    // 4. Create the message queue
     ctx->queue = skynet_mq_create(ctx->handle);
     
-    // 5. 注册服务
+    // 5. Register the service
     skynet_handle_register(ctx);
     
     return ctx;
 }
 ```
 
-### 服务销毁
+### Service Destruction
 
 ```c
-// skynet_server.c 中的服务销毁
+// Service destruction in skynet_server.c
 
 void skynet_context_release(struct skynet_context *ctx) {
-    // 减少引用计数
+    // Decrease the reference count
     if (__sync_sub_and_fetch(&ctx->ref, 1) == 0) {
-        // 释放实例
+        // Release the instance
         skynet_module_instance_release(ctx->mod, ctx->instance);
         
-        // 释放消息队列
+        // Release the message queue
         skynet_mq_release(ctx->queue);
         
-        // 注销服务
+        // Unregister the service
         skynet_handle_retire(ctx->handle);
         
-        // 释放内存
+        // Free the memory
         skynet_free(ctx);
     }
 }
 ```
 
-## 服务管理
+## Service Management
 
-### 服务句柄
+### Service Handles
 
-每个服务都有一个唯一的句柄：
+Every service has a unique handle:
 
 ```c
 struct handle_storage {
     struct rwlock lock;
     uint32_t harbor;           // Harbor ID
-    int slot_size;             // 槽位大小
-    struct skynet_context **slot; // 服务数组
+    int slot_size;             // Slot size
+    struct skynet_context **slot; // Service array
 };
 ```
 
-### 句柄查找
+### Handle Lookup
 
 ```c
-// 按句柄查找服务
+// Find a service by handle
 struct skynet_context * skynet_handle_grab(uint32_t handle) {
     struct handle_storage *s = H;
     rwlock_rlock(&s->lock);
@@ -173,106 +173,106 @@ struct skynet_context * skynet_handle_grab(uint32_t handle) {
 }
 ```
 
-### 名称服务
+### Name Service
 
-服务可以通过名称注册和查找：
+Services can be registered and looked up by name:
 
 ```lua
--- 注册服务名称
+-- Register a service name
 skynet.register("player_service")
 
--- 按名称查找服务
+-- Look up a service by name
 local player_service = skynet.localname("player_service")
 
--- 全局名称服务（跨节点）
+-- Global name service (cross-node)
 skynet.name("player_service", skynet.self())
 local player_service = skynet.queryservice("player_service")
 ```
 
-## 服务间通信
+## Inter-Service Communication
 
-### 直接通信
+### Direct Communication
 
 ```lua
--- 发送消息
+-- Send a message
 skynet.send(target_handle, "lua", cmd, ...)
 
--- 调用并等待结果
+-- Call and wait for the result
 local result = skynet.call(target_handle, "lua", cmd, ...)
 ```
 
-### 通过名称通信
+### Communication by Name
 
 ```lua
--- 通过名称发送
+-- Send by name
 local target = skynet.localname("service_name")
 skynet.send(target, "lua", cmd, ...)
 
--- 通过名称调用
+-- Call by name
 local target = skynet.localname("service_name")
 local result = skynet.call(target, "lua", cmd, ...)
 ```
 
-### 广播消息
+### Broadcast Messages
 
 ```lua
--- 向所有服务广播
+-- Broadcast to all services
 skynet.send_broadcast("lua", "announcement", message)
 ```
 
-## 服务配置
+## Service Configuration
 
-### 启动配置
+### Startup Configuration
 
 ```lua
--- config 文件
+-- config file
 skynet.start(function()
-    -- 启动服务
+    -- Start services
     local logger = skynet.newservice("logger")
     local gate = skynet.newservice("gate", "ws://0.0.0.0:8001")
     local game = skynet.newservice("game")
     
-    -- 设置全局服务
+    -- Set up global services
     skynet.name(".logger", logger)
     skynet.name(".gate", gate)
     skynet.name(".game", game)
 end)
 ```
 
-### 服务参数
+### Service Parameters
 
 ```lua
--- 创建服务时传递参数
+-- Pass parameters when creating a service
 local player = skynet.newservice("player", player_id, player_data)
 
--- 服务接收参数
+-- The service receives the parameters
 local skynet = require "skynet"
 local player_id, player_data = ...
 
 skynet.start(function()
-    -- 使用参数初始化
+    -- Use the parameters for initialization
     init_player(player_id, player_data)
 end)
 ```
 
-## 服务模块
+## Service Modules
 
-### 模块加载
+### Module Loading
 
 ```c
-// skynet_module.c 中的模块加载
+// Module loading in skynet_module.c
 
 struct skynet_module * skynet_module_query(const char *name) {
-    // 1. 查找已加载的模块
+    // 1. Look up an already loaded module
     struct skynet_module *mod = find_module(name);
     if (mod) return mod;
     
-    // 2. 加载新模块
+    // 2. Load a new module
     mod = skynet_malloc(sizeof(*mod));
     mod->name = name;
     mod->module = dlopen(path, RTLD_NOW | RTLD_GLOBAL);
     
-    // 3. 获取函数指针
+    // 3. Get the function pointers
     mod->init = dlsym(mod->module, "skynet_module_create");
     mod->release = dlsym(mod->module, "skynet_module_release");
     mod->signal = dlsym(mod->module, "skynet_module_signal");
@@ -281,35 +281,35 @@ struct skynet_module * skynet_module_query(const char *name) {
 }
 ```
 
-### 模块接口
+### Module Interface
 
 ```c
-// C 模块必须实现的接口
+// The interface that a C module must implement
 
-// 创建实例
+// Create an instance
 void * skynet_module_create(const char *args) {
     struct my_module *inst = malloc(sizeof(*inst));
-    // 初始化...
+    // Initialize...
     return inst;
 }
 
-// 释放实例
+// Release an instance
 void skynet_module_release(void *inst) {
     struct my_module *m = inst;
-    // 清理资源...
+    // Clean up resources...
     free(m);
 }
 
-// 信号处理
+// Signal handling
 void skynet_module_signal(void *inst, int signal) {
     struct my_module *m = inst;
-    // 处理信号...
+    // Handle the signal...
 }
 ```
 
-## 服务示例
+## Service Examples
 
-### 1. Logger 服务
+### 1. Logger Service
 
 ```lua
 -- logger.lua
@@ -329,7 +329,7 @@ skynet.start(function()
 end)
 ```
 
-### 2. 数据库服务
+### 2. Database Service
 
 ```lua
 -- db_service.lua
@@ -361,7 +361,7 @@ skynet.start(function()
 end)
 ```
 
-### 3. 玩家服务
+### 3. Player Service
 
 ```lua
 -- player_service.lua
@@ -390,15 +390,15 @@ skynet.start(function()
 end)
 ```
 
-## 服务间协作
+## Inter-Service Cooperation
 
-### 请求-响应模式
+### Request-Response Pattern
 
 ```lua
--- 服务 A
+-- Service A
 local result = skynet.call(service_b, "lua", "process", data)
 
--- 服务 B
+-- Service B
 skynet.dispatch("lua", function(session, address, cmd, data)
     if cmd == "process" then
         local result = heavy_processing(data)
@@ -407,47 +407,47 @@ skynet.dispatch("lua", function(session, address, cmd, data)
 end)
 ```
 
-### 流水线模式
+### Pipeline Pattern
 
 ```lua
--- 服务 A → 服务 B → 服务 C
+-- Service A → Service B → Service C
 local step1 = skynet.call(service_a, "lua", "step1", data)
 local step2 = skynet.call(service_b, "lua", "step2", step1)
 local step3 = skynet.call(service_c, "lua", "step3", step2)
 ```
 
-### 并行处理
+### Parallel Processing
 
 ```lua
--- 并行调用多个服务
+-- Call multiple services in parallel
 local co1 = skynet.fcall(service_a, "lua", "task1")
 local co2 = skynet.fcall(service_b, "lua", "task2")
 local co3 = skynet.fcall(service_c, "lua", "task3")
 
--- 等待所有结果
+-- Wait for all results
 local result1 = skynet.wait(co1)
 local result2 = skynet.wait(co2)
 local result3 = skynet.wait(co3)
 ```
 
-## 最佳实践
+## Best Practices
 
-### 1. 服务粒度
+### 1. Service Granularity
 
 ```lua
--- 好：职责单一的服务
-local player_service = {}      -- 只处理玩家逻辑
-local inventory_service = {}   -- 只处理背包逻辑
-local quest_service = {}       -- 只处理任务逻辑
+-- Good: services with a single responsibility
+local player_service = {}      -- Only handles player logic
+local inventory_service = {}   -- Only handles inventory logic
+local quest_service = {}       -- Only handles quest logic
 
--- 差：职责混乱的服务
-local god_service = {}         -- 处理所有逻辑
+-- Bad: services with mixed responsibilities
+local god_service = {}         -- Handles all logic
 ```
 
-### 2. 错误处理
+### 2. Error Handling
 
 ```lua
--- 服务应该处理错误而不是崩溃
+-- Services should handle errors instead of crashing
 skynet.dispatch("lua", function(session, address, cmd, ...)
     local ok, result = pcall(function()
         return handle_command(cmd, ...)
@@ -462,27 +462,27 @@ skynet.dispatch("lua", function(session, address, cmd, ...)
 end)
 ```
 
-### 3. 资源管理
+### 3. Resource Management
 
 ```lua
--- 在服务退出时清理资源
+-- Clean up resources when the service exits
 skynet.start(function()
-    -- 初始化资源
+    -- Initialize resources
     local resource = acquire_resource()
     
     skynet.dispatch("lua", function(session, address, cmd, ...)
-        -- 使用资源
+        -- Use the resource
     end)
     
-    -- 注册退出清理
+    -- Register an exit cleanup
     skynet.atexit(function()
         release_resource(resource)
     end)
 end)
 ```
 
-## 下一步
+## Next Steps
 
-- [消息队列实现](/architecture/message-queue) - 深入消息队列的实现
-- [服务调度](/architecture/service-scheduling) - 理解服务如何被调度
-- [skynet_server.c 分析](/analysis/skynet-server) - 服务管理的源码分析
+- [Message Queue Implementation](/architecture/message-queue) - A deep dive into the implementation of the message queue
+- [Service Scheduling](/architecture/service-scheduling) - Understand how services are scheduled
+- [skynet_server.c Analysis](/analysis/skynet-server) - Source code analysis of service management

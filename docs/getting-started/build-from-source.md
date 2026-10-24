@@ -1,14 +1,14 @@
-# 从源码构建
+# Building from Source
 
-在实际项目中，我们通常需要从源码构建 Skynet，这样可以方便地进行调试和定制。这里记录了构建过程中的经验。
+In actual projects, we usually need to build Skynet from source code, which allows for easier debugging and customization. Here we document the experience from the build process.
 
-## 系统要求
+## System Requirements
 
 ### Linux
 
-- GCC 或 Clang
+- GCC or Clang
 - GNU Make
-- autoconf (用于 jemalloc)
+- autoconf (for jemalloc)
 
 ### macOS
 
@@ -17,17 +17,17 @@
 
 ### FreeBSD
 
-- GCC 或 Clang
+- GCC or Clang
 - GNU Make (gmake)
 
-## 获取源码
+## Getting the Source Code
 
 ```bash
 git clone https://github.com/cuihairu/skynet.git
 cd skynet
 ```
 
-## 构建 Skynet
+## Building Skynet
 
 ### Linux
 
@@ -35,7 +35,7 @@ cd skynet
 make linux
 ```
 
-或者：
+Or:
 
 ```bash
 export PLAT=linux
@@ -60,289 +60,289 @@ gmake freebsd
 gmake openbsd
 ```
 
-## 构建选项
+## Build Options
 
-### 指定平台
+### Specifying the Platform
 
 ```bash
 make PLATFORM
-# PLATFORM 可以是: linux, macosx, freebsd, openbsd
+# PLATFORM can be: linux, macosx, freebsd, openbsd
 ```
 
-### 清理构建
+### Cleaning the Build
 
 ```bash
 make cleanall
 ```
 
-### 仅构建 Lua
+### Building Lua Only
 
 ```bash
 make lua
 ```
 
-### 仅构建 skynet
+### Building Skynet Only
 
 ```bash
 make skynet
 ```
 
-## 构建系统结构
+## Build System Structure
 
-### Makefile 结构
+### Makefile Structure
 
 ```
-Makefile              # 主构建文件
-├── platform.mk       # 平台相关配置
-├── mingw.mk          # MinGW (Windows) 配置
+Makefile              # Main build file
+├── platform.mk       # Platform-specific configuration
+├── mingw.mk          # MinGW (Windows) configuration
 └── 3rd/
-    ├── lua/          # Lua 构建
-    ├── jemalloc/     # jemalloc 内存分配器
-    └── lpeg/         # LPEG 模块
+    ├── lua/          # Lua build
+    ├── jemalloc/     # jemalloc memory allocator
+    └── lpeg/         # LPEG module
 ```
 
-### 主 Makefile
+### Main Makefile
 
 ```makefile
-# 主要构建目标
+# Main build targets
 all : $(ALL)
 
-# Skynet 核心
+# Skynet core
 SKYNET_SRC = skynet-src
 
-# 源文件
+# Source files
 SKYNET_DEFINES =
 CSERVICE = cservice
 
-# 构建 skynet
+# Build skynet
 skynet : $(LUA_LIB) $(JEMALLOC_STATICLIB) $(SKYNET_DEFINES)
 	$(CC) $(CFLAGS) -o $@ ...
 ```
 
-### 平台配置
+### Platform Configuration
 
 ```makefile
 # platform.mk
 
-# Linux 配置
+# Linux configuration
 ifeq ($(PLAT),linux)
   CFLAGS += -DUSE_$(EXPORT_FLAG)
   SHARED := -shared
   LIBS += -lpthread -lrt
 endif
 
-# macOS 配置
+# macOS configuration
 ifeq ($(PLAT),macosx)
   SHARED := -bundle -undefined dynamic_lookup
 endif
 ```
 
-## 核心组件构建
+## Core Component Builds
 
 ### 1. Lua
 
-Skynet 使用修改版的 Lua 5.5.0：
+Skynet uses a modified version of Lua 5.5.0:
 
 ```bash
-# 构建 Lua
+# Build Lua
 make lua
 
-# 输出文件
-3rd/lua/lua        # Lua 解释器
-3rd/lua/luac       # Lua 编译器
-3rd/lua/liblua.a   # Lua 静态库
+# Output files
+3rd/lua/lua        # Lua interpreter
+3rd/lua/luac       # Lua compiler
+3rd/lua/liblua.a   # Lua static library
 ```
 
 ### 2. jemalloc
 
-高性能内存分配器：
+High-performance memory allocator:
 
 ```bash
-# 构建 jemalloc
+# Build jemalloc
 make jemalloc
 
-# 输出文件
+# Output files
 3rd/jemalloc/lib/libjemalloc.a
 ```
 
 ### 3. LPEG
 
-Lua 模式匹配库：
+Lua pattern matching library:
 
 ```bash
-# 构建 LPEG
+# Build LPEG
 make lpeg
 
-# 输出文件
+# Output files
 luaclib/lpeg.so
 ```
 
-## 服务模块构建
+## Service Module Builds
 
-### C 服务
+### C Services
 
-C 服务模块编译为 `.so` 文件：
+C service modules are compiled into `.so` files:
 
 ```bash
-# 构建所有 C 服务
+# Build all C services
 make cservice
 
-# 输出目录
+# Output directory
 cservice/
-├── logger.so      # 日志服务
-├── gate.so        # 网关服务
-├── harbor.so      # 集群服务
+├── logger.so      # Logger service
+├── gate.so        # Gateway service
+├── harbor.so      # Cluster service
 └── ...
 ```
 
-### Lua C 模块
+### Lua C Modules
 
-Lua 的 C 扩展模块：
+Lua C extension modules:
 
 ```bash
-# 构建所有 Lua C 模块
+# Build all Lua C modules
 make luaclib
 
-# 输出目录
+# Output directory
 luaclib/
-├── bson.so        # BSON 支持
-├── md5.so         # MD5 哈希
-├── lpeg.so        # LPEG 模式匹配
+├── bson.so        # BSON support
+├── md5.so         # MD5 hash
+├── lpeg.so        # LPEG pattern matching
 └── ...
 ```
 
-## 构建配置
+## Build Configuration
 
-### 环境变量
+### Environment Variables
 
 ```bash
-# 指定平台
+# Specify platform
 export PLAT=linux
 
-# 指定编译器
+# Specify compiler
 export CC=gcc
 
-# 指定 CFLAGS
+# Specify CFLAGS
 export CFLAGS="-O2 -Wall"
 
-# 指定 Lua 版本
+# Specify Lua version
 export LUA_VERSION=5.5
 ```
 
-### 自定义构建
+### Custom Build
 
-修改 Makefile 中的变量：
+Modify variables in the Makefile:
 
 ```makefile
-# 自定义 CFLAGS
+# Custom CFLAGS
 CFLAGS += -DDEBUG
 
-# 自定义库路径
+# Custom library path
 LIBS += -L/path/to/libs
 
-# 自定义包含路径
+# Custom include path
 CFLAGS += -I/path/to/includes
 ```
 
-## 调试构建
+## Debug Builds
 
-### 启用调试符号
+### Enabling Debug Symbols
 
 ```bash
 make linux DEBUG=1
 ```
 
-### 启用地址消毒器
+### Enabling Address Sanitizer
 
 ```bash
 make linux SANITIZE=address
 ```
 
-### 启用内存消毒器
+### Enabling Memory Sanitizer
 
 ```bash
 make linux SANITIZE=memory
 ```
 
-## 测试构建
+## Test Builds
 
-### 运行测试
+### Running Tests
 
 ```bash
-# 启动 skynet 节点
+# Start skynet node
 ./skynet examples/config
 
-# 在另一个终端运行客户端
+# Run client in another terminal
 ./3rd/lua/lua examples/client.lua
 ```
 
-### 运行单元测试
+### Running Unit Tests
 
 ```bash
-# 运行 Lua 测试
+# Run Lua tests
 ./3rd/lua/lua test/test.lua
 
-# 运行 C 测试
+# Run C tests
 make test
 ./test/test
 ```
 
-## 安装
+## Installation
 
-### 系统安装
+### System Installation
 
 ```bash
-# 安装到 /usr/local
+# Install to /usr/local
 sudo make install PREFIX=/usr/local
 ```
 
-### 自定义安装
+### Custom Installation
 
 ```bash
-# 安装到指定目录
+# Install to a specified directory
 make install PREFIX=/opt/skynet
 ```
 
-## 构建问题排查
+## Build Troubleshooting
 
-### 常见问题
+### Common Problems
 
-1. **找不到 Lua**
+1. **Lua not found**
    ```bash
-   # 确保 Lua 已构建
+   # Ensure Lua is built
    make lua
    ```
 
-2. **找不到 jemalloc**
+2. **jemalloc not found**
    ```bash
-   # 确保 jemalloc 已构建
+   # Ensure jemalloc is built
    make jemalloc
    ```
 
-3. **链接错误**
+3. **Linking errors**
    ```bash
-   # 检查库路径
+   # Check library paths
    ldd skynet
    ```
 
-4. **编译错误**
+4. **Compilation errors**
    ```bash
-   # 检查编译器版本
+   # Check compiler version
    gcc --version
    ```
 
-### 清理并重新构建
+### Cleaning and Rebuilding
 
 ```bash
-# 清理所有构建产物
+# Clean all build artifacts
 make cleanall
 
-# 重新构建
+# Rebuild
 make linux
 ```
 
-## 下一步
+## Next Steps
 
-- [项目结构](/getting-started/project-structure) - 了解项目的目录结构
-- [核心 API](/getting-started/api-reference) - 学习 Skynet 的核心 API
-- [架构概览](/architecture/overview) - 理解 Skynet 的整体架构
+- [Project Structure](/getting-started/project-structure) - Learn about the project's directory structure
+- [Core API](/getting-started/api-reference) - Learn Skynet's core API
+- [Architecture Overview](/architecture/overview) - Understand Skynet's overall architecture

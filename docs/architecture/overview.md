@@ -1,70 +1,70 @@
-# 架构概览
+# Architecture Overview
 
-回顾 Skynet 的架构设计，核心理念其实很简单：**消息驱动 + Actor 模型**。这种设计不是凭空想出来的，而是游戏服务器场景下的自然选择。
+Looking back at Skynet's architectural design, the core philosophy is actually quite simple: **message-driven + Actor model**. This design was not invented out of thin air; it is a natural choice for the game server scenario.
 
-## 设计哲学
+## Design Philosophy
 
-### 消息驱动
+### Message-Driven
 
-在实际项目中，我们发现消息驱动解决了几个关键问题：
+In real projects, we found that message-driven design solves several key problems:
 
-1. **解耦**：服务之间只通过消息交互，改一个服务不会影响其他服务
-2. **可追溯**：所有交互都有消息记录，出问题时容易排查
-3. **异步友好**：消息天然支持异步，不会阻塞调用方
+1. **Decoupling**: Services interact only through messages, so changing one service does not affect other services
+2. **Traceability**: All interactions are recorded as messages, making problems easy to troubleshoot
+3. **Async-friendly**: Messages naturally support asynchrony and never block the caller
 
 ```lua
--- 发送消息，不等待回复
+-- Send a message, don't wait for a reply
 skynet.send(target, "lua", "update", data)
 
--- 发送消息，等待回复
+-- Send a message and wait for a reply
 local result = skynet.call(target, "lua", "query", key)
 ```
 
-### 服务隔离
+### Service Isolation
 
-每个服务都是独立的，拥有自己的：
-- 消息队列
-- 执行上下文
-- 状态数据
+Every service is independent, with its own:
+- Message queue
+- Execution context
+- State data
 
-这种设计避免了共享内存带来的锁竞争问题。在实际项目中，我们遇到过很多因为共享状态导致的 bug，Skynet 的设计从根本上避免了这类问题。
+This design avoids the lock contention problems caused by shared memory. In real projects, we have run into many bugs caused by shared state; Skynet's design fundamentally avoids this class of problems.
 
-### 同步编程体验
+### Synchronous Programming Experience
 
-虽然底层是异步的，但通过 Lua 协程，可以用同步的方式写代码：
+Although the underlying layer is asynchronous, Lua coroutines let you write code in a synchronous style:
 
 ```lua
--- 看起来是同步的，实际上是异步的
+-- Looks synchronous, but is actually asynchronous
 local result = skynet.call("service_name", "lua", "query", data)
--- 这里会挂起，直到收到回复
+-- This suspends until a reply arrives
 process(result)
 ```
 
-这种设计降低了异步编程的心智负担，开发者不需要写回调函数。
+This design reduces the mental burden of asynchronous programming; developers do not need to write callback functions.
 
-## 核心架构
+## Core Architecture
 
-### 分层设计
+### Layered Design
 
-从实际项目经验看，分层设计让代码更容易维护：
+Judging from real project experience, layered design makes code easier to maintain:
 
 ```mermaid
 graph TB
-    subgraph 业务层
-        L1[Lua 服务<br/>游戏逻辑]
-        L2[Lua 服务<br/>业务逻辑]
+    subgraph Business Layer
+        L1[Lua Service<br/>Game Logic]
+        L2[Lua Service<br/>Business Logic]
     end
     
-    subgraph 框架层
-        F1[skynet.lua<br/>核心 API]
-        F2[skynet.coroutine<br/>协程支持]
+    subgraph Framework Layer
+        F1[skynet.lua<br/>Core API]
+        F2[skynet.coroutine<br/>Coroutine Support]
     end
     
-    subgraph 核心层
-        C1[skynet_server.c<br/>服务管理]
-        C2[skynet_mq.c<br/>消息队列]
-        C3[skynet_timer.c<br/>定时器]
-        C4[socket_server.c<br/>网络 I/O]
+    subgraph Core Layer
+        C1[skynet_server.c<br/>Service Management]
+        C2[skynet_mq.c<br/>Message Queue]
+        C3[skynet_timer.c<br/>Timer]
+        C4[socket_server.c<br/>Network I/O]
     end
     
     L1 --> F1
@@ -79,31 +79,31 @@ graph TB
     C1 --> C4
 ```
 
-**经验总结**：
+**Lessons learned**:
 
-- 业务层用 Lua，开发效率高，支持热更新
-- 框架层封装常用的编程模式，降低开发门槛
-- 核心层用 C，性能高，稳定性好
+- The business layer uses Lua: high development efficiency, hot updates supported
+- The framework layer encapsulates common programming patterns, lowering the development barrier
+- The core layer uses C: high performance, good stability
 
-### 线程模型
+### Thread Model
 
-Skynet 的线程模型是 **多线程 + 消息驱动**，不是传统的多线程模型：
+Skynet's thread model is **multi-threading + message-driven**, not the traditional multi-threaded model:
 
 ```mermaid
 graph TB
-    subgraph 工作线程
+    subgraph Worker Threads
         W1[Worker 1]
         W2[Worker 2]
         W3[Worker 3]
         WN[Worker N]
     end
     
-    GQ[全局消息队列]
+    GQ[Global Message Queue]
     
-    subgraph 辅助线程
-        T[Timer 线程<br/>定时器更新]
-        S[Socket 线程<br/>网络 I/O]
-        M[Monitor 线程<br/>死循环检测]
+    subgraph Auxiliary Threads
+        T[Timer Thread<br/>Timer Updates]
+        S[Socket Thread<br/>Network I/O]
+        M[Monitor Thread<br/>Infinite Loop Detection]
     end
     
     W1 <--> GQ
@@ -113,38 +113,38 @@ graph TB
     
     T --> GQ
     S --> GQ
-    M -.->|检测| W1
-    M -.->|检测| W2
-    M -.->|检测| W3
-    M -.->|检测| WN
+    M -.->|detect| W1
+    M -.->|detect| W2
+    M -.->|detect| W3
+    M -.->|detect| WN
 ```
 
-**经验总结**：
+**Lessons learned**:
 
-- Worker 线程：处理业务消息，数量可配置（通常等于 CPU 核心数）
-- Timer 线程：更新定时器，2.5ms 精度
-- Socket 线程：处理网络 I/O，独立线程避免阻塞业务
-- Monitor 线程：检测死循环，5 秒检查一次
+- Worker threads: process business messages, count is configurable (usually equal to the number of CPU cores)
+- Timer thread: updates timers with 2.5ms precision
+- Socket thread: handles network I/O, a dedicated thread avoids blocking business logic
+- Monitor thread: detects infinite loops, checks once every 5 seconds
 
-## 核心组件
+## Core Components
 
-### 消息队列
+### Message Queue
 
-消息队列是 Skynet 的核心，设计简单但高效：
+The message queue is the heart of Skynet; the design is simple yet efficient:
 
 ```mermaid
 graph TB
-    subgraph 全局消息队列
-        GQ1[队列 1] --> GQ2[队列 2]
-        GQ2 --> GQ3[队列 3]
-        GQ3 --> GQ4[队列 4]
+    subgraph Global Message Queue
+        GQ1[Queue 1] --> GQ2[Queue 2]
+        GQ2 --> GQ3[Queue 3]
+        GQ3 --> GQ4[Queue 4]
     end
     
-    subgraph 服务消息队列
-        MQ1[消息 1]
-        MQ2[消息 2]
-        MQ3[消息 3]
-        MQ4[消息 4]
+    subgraph Service Message Queues
+        MQ1[Message 1]
+        MQ2[Message 2]
+        MQ3[Message 3]
+        MQ4[Message 4]
     end
     
     GQ1 --> MQ1
@@ -152,57 +152,57 @@ graph TB
     GQ3 --> MQ3
     GQ4 --> MQ4
     
-    Worker[工作线程] --> GQ1
+    Worker[Worker Thread] --> GQ1
     Worker --> GQ2
     Worker --> GQ3
     Worker --> GQ4
 ```
 
-**设计特点**：
+**Design characteristics**:
 
-- 每个服务一个消息队列，避免锁竞争
-- 全局队列负责调度，保证公平性
-- 环形缓冲区实现，内存效率高
+- One message queue per service, avoiding lock contention
+- The global queue handles scheduling, ensuring fairness
+- Ring buffer implementation, high memory efficiency
 
-### 服务调度
+### Service Scheduling
 
-工作线程从全局队列取服务队列，处理其中的消息：
+Worker threads take service queues from the global queue and process the messages in them:
 
 ```c
-// 工作线程主循环
+// Worker thread main loop
 while (!quit) {
-    // 从全局队列取服务队列
+    // Take a service queue from the global queue
     q = skynet_context_message_dispatch(sm, q, weight);
     
     if (q == NULL) {
-        // 没有消息，休眠等待
+        // No messages, sleep and wait
         pthread_cond_wait(&cond, &mutex);
     }
 }
 ```
 
-**调度策略**：
+**Scheduling policy**:
 
-- 权重机制：不同线程有不同的优先级
-- 唤醒策略：有消息时唤醒最少一个线程
-- 休眠策略：无消息时休眠，节省 CPU
+- Weight mechanism: different threads have different priorities
+- Wake-up policy: when messages arrive, wake up at least one thread
+- Sleep policy: sleep when there are no messages, saving CPU
 
-### 定时器
+### Timer
 
-基于时间轮的定时器，支持毫秒级精度：
+A timer based on a timing wheel, supporting millisecond precision:
 
 ```mermaid
 graph TB
-    subgraph 时间轮
+    subgraph Timing Wheel
         direction TB
-        subgraph 近期定时器 near[256]
+        subgraph Near timers near[256]
             N0[0]
             N1[1]
             N2[2]
             N255[255]
         end
         
-        subgraph 远期定时器 t[4][64]
+        subgraph Remote timers t[4][64]
             L0[Level 0<br/>256-16383]
             L1[Level 1<br/>16384-1048575]
             L2[Level 2<br/>1048576-67108863]
@@ -216,155 +216,155 @@ graph TB
     L3 --> L2
 ```
 
-**设计特点**：
+**Design characteristics**:
 
-- O(1) 添加定时器
-- O(1) 推进时间
-- 分级存储，内存效率高
+- O(1) timer addition
+- O(1) time advancement
+- Tiered storage, high memory efficiency
 
-### 网络 I/O
+### Network I/O
 
-基于 epoll/kqueue 的异步 I/O，独立线程处理：
+Asynchronous I/O based on epoll/kqueue, handled by a dedicated thread:
 
 ```mermaid
 sequenceDiagram
-    participant 服务线程
-    participant 管道
-    participant Socket线程
+    participant Service Thread
+    participant Pipe
+    participant Socket Thread
     participant epoll
     
-    服务线程->>管道: 发送命令
-    Socket线程->>管道: 读取命令
-    Socket线程->>epoll: 处理事件
-    epoll-->>Socket线程: 返回事件
-    Socket线程-->>服务线程: 返回结果
+    Service Thread->>Pipe: Send command
+    Socket Thread->>Pipe: Read command
+    Socket Thread->>epoll: Process events
+    epoll-->>Socket Thread: Return events
+    Socket Thread-->>Service Thread: Return results
 ```
 
-**设计特点**：
+**Design characteristics**:
 
-- 独立线程，不阻塞业务
-- 管道通信，避免锁竞争
-- 批量事件处理，减少系统调用
+- Dedicated thread, never blocks business logic
+- Pipe communication, avoiding lock contention
+- Batch event processing, fewer system calls
 
-## 消息生命周期
+## Message Lifecycle
 
-一个消息从产生到被处理，经历这些阶段：
+A message goes through these stages from generation to being processed:
 
 ```mermaid
 graph TB
-    A[1. 消息产生] --> B[2. 入队]
-    B --> C[3. 调度]
-    C --> D[4. 处理]
-    D --> E[5. 完成]
+    A[1. Message generated] --> B[2. Enqueued]
+    B --> C[3. Scheduled]
+    C --> D[4. Processed]
+    D --> E[5. Done]
     
-    subgraph 消息来源
-        A1[服务发送<br/>skynet.send/call]
-        A2[定时器触发<br/>skynet.timeout]
-        A3[网络事件<br/>socket_server_poll]
+    subgraph Message Sources
+        A1[Service send<br/>skynet.send/call]
+        A2[Timer trigger<br/>skynet.timeout]
+        A3[Network event<br/>socket_server_poll]
     end
     
     A1 --> A
     A2 --> A
     A3 --> A
     
-    subgraph 处理流程
-        B --> B1[目标服务的消息队列]
-        C --> C1[全局队列 → 工作线程]
-        D --> D1[调用服务的回调函数]
-        E --> E1[继续处理下一条消息]
+    subgraph Processing Flow
+        B --> B1[Target service's message queue]
+        C --> C1[Global queue → Worker thread]
+        D --> D1[Call the service's callback function]
+        E --> E1[Continue with the next message]
     end
 ```
 
-## 服务状态机
+## Service State Machine
 
-一个服务在其生命周期中的状态转换：
+The state transitions of a service over its lifecycle:
 
 ```mermaid
 stateDiagram-v2
-    [*] --> 不存在: 创建
-    不存在 --> 初始化: 初始化完成
-    初始化 --> 空闲: 初始化完成
-    空闲 --> 处理中: 消息到达
-    处理中 --> 空闲: 处理完成
-    处理中 --> 销毁: 服务退出
-    空闲 --> 销毁: 服务退出
-    销毁 --> [*]
+    [*] --> NonExistent: Create
+    NonExistent --> Initializing: Initialization complete
+    Initializing --> Idle: Initialization complete
+    Idle --> Processing: Message arrives
+    Processing --> Idle: Processing complete
+    Processing --> Destroyed: Service exits
+    Idle --> Destroyed: Service exits
+    Destroyed --> [*]
     
-    note right of 空闲: 等待消息
-    note right of 处理中: 执行回调
+    note right of Idle: Waiting for messages
+    note right of Processing: Executing callback
 ```
 
-## 关键设计决策
+## Key Design Decisions
 
-回顾 Skynet 的设计，有几个关键决策值得思考：
+Looking back at Skynet's design, several key decisions are worth reflecting on:
 
-### 1. 为什么选择 Actor 模型？
+### 1. Why the Actor Model?
 
-游戏服务器的特点是：
-- 大量独立实体（玩家、NPC、怪物）
-- 实体之间需要频繁交互
-- 需要高并发处理
+Game servers are characterized by:
+- Large numbers of independent entities (players, NPCs, monsters)
+- Entities that need to interact frequently
+- A need for high concurrency
 
-Actor 模型完美契合这些需求，每个实体可以是一个 Actor，消息传递避免了共享状态的复杂性。
+The Actor model fits these needs perfectly: each entity can be an Actor, and message passing avoids the complexity of shared state.
 
-### 2. 为什么用 Lua？
+### 2. Why Lua?
 
-- **轻量级**：Lua VM 开销小，可以为每个服务创建独立的 VM
-- **协程支持**：Lua 协程让异步编程变得简单
-- **热更新**：可以在运行时替换代码
-- **开发效率**：Lua 语法简洁，开发效率高
+- **Lightweight**: the Lua VM has low overhead, so each service can have its own VM
+- **Coroutine support**: Lua coroutines make asynchronous programming easy
+- **Hot updates**: code can be replaced at runtime
+- **Development efficiency**: Lua's concise syntax makes development fast
 
-### 3. 为什么用 C 实现核心？
+### 3. Why C for the Core?
 
-- **性能**：消息队列、调度器等核心组件需要极致性能
-- **控制力**：需要精确控制内存、线程等资源
-- **稳定性**：核心逻辑相对固定，用 C 实现更稳定
+- **Performance**: core components such as the message queue and scheduler need ultimate performance
+- **Control**: memory, threads, and other resources must be controlled precisely
+- **Stability**: core logic rarely changes, implementing it in C is more stable
 
-### 4. 为什么每个服务有独立的消息队列？
+### 4. Why Does Every Service Have Its Own Message Queue?
 
-- **隔离性**：服务之间互不干扰
-- **公平调度**：每个服务公平地获得处理机会
-- **简化设计**：避免复杂的锁竞争
+- **Isolation**: services never interfere with each other
+- **Fair scheduling**: every service gets a fair share of processing time
+- **Simpler design**: avoids complicated lock contention
 
-## 与其他架构的对比
+## Comparison with Other Architectures
 
-| 特性 | Skynet | 传统多线程 | Go | Erlang |
+| Feature | Skynet | Traditional Multithreading | Go | Erlang |
 |------|--------|-----------|-----|--------|
-| 并发模型 | Actor | 线程 | Goroutine | Actor |
-| 共享状态 | 无 | 有 | 有限 | 无 |
-| 内存模型 | 独立 | 共享 | 共享 | 独立 |
-| 热更新 | 支持 | 困难 | 困难 | 支持 |
-| 学习曲线 | 中等 | 低 | 低 | 高 |
-| 适用场景 | 游戏服务器 | 通用 | 通用 | 电信 |
+| Concurrency model | Actor | Threads | Goroutine | Actor |
+| Shared state | None | Yes | Limited | None |
+| Memory model | Isolated | Shared | Shared | Isolated |
+| Hot update | Supported | Difficult | Difficult | Supported |
+| Learning curve | Medium | Low | Low | High |
+| Use cases | Game servers | General purpose | General purpose | Telecom |
 
-## 实践经验
+## Practical Experience
 
-### 1. 服务粒度
+### 1. Service Granularity
 
-在实际项目中，服务粒度的选择很重要：
+In real projects, choosing the right service granularity matters a lot:
 
-- **太粗**：单个服务负载过重，难以扩展
-- **太细**：消息通信开销大，增加复杂度
-- **合适**：一个服务负责一个独立的功能
+- **Too coarse**: a single service carries too much load and is hard to scale
+- **Too fine**: message communication overhead grows and complexity increases
+- **Just right**: one service is responsible for one independent feature
 
-### 2. 消息设计
+### 2. Message Design
 
-消息设计的好坏直接影响系统的可维护性：
+How well messages are designed directly affects the maintainability of the system:
 
-- **明确**：消息类型清晰，参数明确
-- **简洁**：避免传递大量数据
-- **可扩展**：预留扩展字段
+- **Explicit**: clear message types, explicit parameters
+- **Concise**: avoid passing large amounts of data
+- **Extensible**: reserve fields for future extension
 
-### 3. 错误处理
+### 3. Error Handling
 
-消息驱动系统的错误处理需要特别注意：
+Error handling in a message-driven system requires special attention:
 
-- **消息丢失**：确保消息不会丢失
-- **超时处理**：设置合理的超时时间
-- **错误传播**：错误信息能正确传递
+- **Message loss**: make sure messages are never lost
+- **Timeout handling**: set reasonable timeout values
+- **Error propagation**: error information must be delivered correctly
 
-## 下一步
+## Next Steps
 
-- [Actor 模型](/architecture/actor-model) - 深入理解 Actor 模型的实现
-- [消息驱动设计](/architecture/message-driven) - 消息系统的设计细节
-- [服务与模块](/architecture/service-module) - 服务的创建和管理
+- [Actor Model](/architecture/actor-model) - Understand the Actor model implementation in depth
+- [Message-Driven Design](/architecture/message-driven) - Design details of the message system
+- [Services and Modules](/architecture/service-module) - Creating and managing services

@@ -1,12 +1,12 @@
-# 监控与调试
+# Monitoring and Debugging
 
-> 🚧 本文档正在编写中，敬请期待。
+> 🚧 This document is under construction. Stay tuned.
 
-## 概述
+## Overview
 
-本文将介绍 Skynet 中 监控与调试 的设计与实现。
+This page will cover the design and implementation of Monitoring and Debugging in Skynet.
 
-## 相关源码
+## Related pages
 
-- [核心模块概览](/analysis/core-modules)
-- [架构概览](/architecture/overview)
+- [Core Modules](/analysis/core-modules)
+- [Architecture Overview](/architecture/overview)

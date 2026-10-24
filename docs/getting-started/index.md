@@ -1,46 +1,46 @@
-# 概述
+# Overview
 
-Skynet 是我们团队在游戏服务器开发中常用的框架。经过多个项目的实践，我们认为它的设计思路值得学习和参考。
+Skynet is a framework commonly used by our team in game server development. After practicing across multiple projects, we believe its design philosophy is worth learning from and referencing.
 
-## Skynet 是什么
+## What is Skynet
 
-Skynet 是云风开发的轻量级游戏服务器框架，在国内游戏行业有广泛的应用。从实际使用角度看，它的核心设计可以概括为 **Actor 模型** + **消息驱动**。
+Skynet is a lightweight game server framework developed by cloudwu, with widespread application in the domestic gaming industry. From a practical usage perspective, its core design can be summarized as the **Actor model** + **message-driven**.
 
-### 核心特性
+### Core Features
 
-在实际项目中，我们发现这些特性特别有价值：
+In actual projects, we found these features particularly valuable:
 
-- **Actor 模型**：每个服务都是独立的 Actor，通过消息传递通信，避免了共享状态的复杂性
-- **消息驱动**：所有逻辑都在消息处理中完成，系统行为可追溯
-- **轻量级**：C 核心 + Lua 脚本的分层架构，兼顾性能和开发效率
-- **高性能**：基于 epoll/kqueue 的异步 I/O，单机可处理大量连接
-- **热更新**：Lua 服务支持不停服更新，线上问题修复更灵活
-- **集群支持**：通过 Harbor 机制实现分布式部署，支持水平扩展
+- **Actor Model**: Each service is an independent Actor, communicating through message passing, avoiding the complexity of shared state
+- **Message-Driven**: All logic is completed within message handling, making system behavior traceable
+- **Lightweight**: A C core + Lua scripting layered architecture, balancing performance and development efficiency
+- **High Performance**: Asynchronous I/O based on epoll/kqueue, capable of handling a large number of connections on a single machine
+- **Hot Update**: Lua services support live updates without downtime, making online issue fixes more flexible
+- **Cluster Support**: Distributed deployment through the Harbor mechanism, supporting horizontal scaling
 
-## 架构概览
+## Architecture Overview
 
 ```mermaid
 graph TB
-    subgraph 服务层
-        LS1[Lua 服务<br/>业务逻辑]
-        LS2[Lua 服务<br/>业务逻辑]
-        CS[C 服务<br/>底层功能]
+    subgraph Service Layer
+        LS1[Lua Service<br/>Business Logic]
+        LS2[Lua Service<br/>Business Logic]
+        CS[C Service<br/>Low-level Functions]
     end
 
-    subgraph 调度层
-        MQ[消息队列]
-        SS[服务调度]
+    subgraph Scheduling Layer
+        MQ[Message Queue]
+        SS[Service Scheduling]
     end
 
-    subgraph 工作线程
-        W1[工作线程 1]
-        W2[工作线程 2]
-        WN[工作线程 N]
+    subgraph Worker Threads
+        W1[Worker Thread 1]
+        W2[Worker Thread 2]
+        WN[Worker Thread N]
     end
 
-    subgraph 辅助线程
-        T[定时器]
-        IO[网络 I/O]
+    subgraph Auxiliary Threads
+        T[Timer]
+        IO[Network I/O]
         H[Harbor]
     end
 
@@ -56,55 +56,55 @@ graph TB
     WN --> H
 ```
 
-## 核心组件
+## Core Components
 
-### 消息队列 (skynet_mq.c)
-每个服务都有一个独立的消息队列，服务之间通过向对方的消息队列发送消息来通信。全局消息队列负责调度各个服务的消息队列。
+### Message Queue (skynet_mq.c)
+Each service has an independent message queue. Services communicate by sending messages to each other's message queues. The global message queue is responsible for scheduling the message queues of all services.
 
-### 服务调度 (skynet_server.c)
-多工作线程从全局队列中获取服务队列，处理其中的消息。调度器确保消息被公平地分发到各个工作线程。
+### Service Scheduling (skynet_server.c)
+Multiple worker threads fetch service queues from the global queue and process the messages within them. The scheduler ensures messages are fairly distributed to the various worker threads.
 
-### 定时器 (skynet_timer.c)
-基于时间轮的定时器实现，支持毫秒级的定时任务。用于超时处理、心跳检测等场景。
+### Timer (skynet_timer.c)
+A timer implementation based on the time wheel, supporting millisecond-level scheduled tasks. Used for timeout handling, heartbeat detection, and similar scenarios.
 
-### 网络 I/O (socket_server.c)
-统一的 socket 抽象，支持 TCP/UDP。异步操作完成后通过消息通知服务，让服务可以用同步的方式编写异步逻辑。
+### Network I/O (socket_server.c)
+A unified socket abstraction supporting TCP/UDP. After asynchronous operations complete, services are notified through messages, allowing services to write asynchronous logic in a synchronous manner.
 
-### Lua 虚拟机 (lua-skynet.c)
-每个 Lua 服务都有一个独立的 Lua 虚拟机，保证服务之间的隔离性。支持热更新，可以在运行时替换 Lua 代码。
+### Lua Virtual Machine (lua-skynet.c)
+Each Lua service has an independent Lua virtual machine, ensuring isolation between services. It supports hot updates, allowing Lua code to be replaced at runtime.
 
-### Harbor 集群 (skynet_harbor.c)
-跨节点服务调用机制，支持分布式部署。通过名字服务实现服务的注册和发现。
+### Harbor Cluster (skynet_harbor.c)
+A cross-node service invocation mechanism supporting distributed deployment. Service registration and discovery are implemented through a name service.
 
-## 快速开始
+## Quick Start
 
-### 构建 Skynet
+### Build Skynet
 
 ```bash
 git clone https://github.com/cuihairu/skynet.git
 cd skynet
-make linux  # 或 macosx, freebsd
+make linux  # or macosx, freebsd
 ```
 
-### 运行示例
+### Run Examples
 
 ```bash
-# 启动 skynet 节点
+# Start skynet node
 ./skynet examples/config
 
-# 在另一个终端运行客户端
+# Run client in another terminal
 ./3rd/lua/lua examples/client.lua
 ```
 
-## 文档结构
+## Documentation Structure
 
-- **快速开始**：帮助你快速上手 Skynet
-- **架构解析**：深入理解 Skynet 的设计原理
-- **源码分析**：逐个模块地分析核心实现
+- **Quick Start**: Helps you get started with Skynet quickly
+- **Architecture Analysis**: Deeply understand Skynet's design principles
+- **Source Code Analysis**: Analyze the core implementation module by module
 
-## 适合谁阅读
+## Who Should Read This
 
-- 游戏服务器开发者
-- 对 Actor 模型感兴趣的开发者
-- 想学习高性能网络编程的开发者
-- 希望理解游戏服务器架构的架构师
+- Game server developers
+- Developers interested in the Actor model
+- Developers who want to learn high-performance network programming
+- Architects hoping to understand game server architecture

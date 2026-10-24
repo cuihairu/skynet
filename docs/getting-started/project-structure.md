@@ -1,263 +1,263 @@
-# 项目结构
+# Project Structure
 
-初次接触 Skynet 时，了解项目结构是第一步。这里整理了各个目录和文件的作用，方便快速定位代码。
+When first getting started with Skynet, understanding the project structure is the first step. This page lists the role of every directory and file so you can locate code quickly.
 
-## 根目录结构
+## Root Directory Structure
 
 ```
 skynet/
-├── skynet-src/         # C 核心源码
-├── lualib/             # Lua 库
-├── lualib-src/         # Lua C 扩展
-├── service/            # Lua 服务示例
-├── service-src/        # C 服务源码
-├── examples/           # 示例配置和脚本
-├── test/               # 测试代码
-├── 3rd/                # 第三方依赖
-├── platform.mk         # 平台配置
-├── Makefile            # 主构建文件
-└── README.md           # 项目说明
+├── skynet-src/         # C core source code
+├── lualib/             # Lua libraries
+├── lualib-src/         # Lua C extensions
+├── service/            # Lua service examples
+├── service-src/        # C service source code
+├── examples/           # Example configs and scripts
+├── test/               # Test code
+├── 3rd/                # Third-party dependencies
+├── platform.mk         # Platform configuration
+├── Makefile            # Main build file
+└── README.md           # Project description
 ```
 
-## 核心源码目录
+## Core Source Code Directory
 
 ### skynet-src/
 
-C 语言实现的核心框架：
+The core framework implemented in C:
 
 ```
 skynet-src/
-├── skynet.h                # 主头文件
-├── skynet_main.c           # 程序入口
-├── skynet_start.c          # 系统启动
-├── skynet_server.c         # 服务管理
-├── skynet_mq.c             # 消息队列
-├── skynet_handle.c         # 服务句柄管理
-├── skynet_module.c         # 动态模块加载
-├── skynet_timer.c          # 定时器
-├── skynet_socket.c         # 网络 I/O
-├── skynet_harbor.c         # 集群支持
-├── skynet_daemon.c         # 守护进程
-├── skynet_log.c            # 日志系统
-├── skynet_env.c            # 环境变量
-├── skynet_error.c          # 错误处理
-├── socket_server.c         # Socket 服务器
-├── socket_poll.h           # Socket 轮询抽象
-├── socket_epoll.h          # epoll 实现
-├── socket_kqueue.h         # kqueue 实现
-├── socket_info.h           # Socket 信息
-├── socket_buffer.h         # Socket 缓冲区
-├── malloc_hook.c           # 内存分配钩子
-├── mem_info.c              # 内存信息
-├── spinlock.h              # 自旋锁
-├── rwlock.h                # 读写锁
-└── atomic.h                # 原子操作
+├── skynet.h                # Main header file
+├── skynet_main.c           # Program entry point
+├── skynet_start.c          # System startup
+├── skynet_server.c         # Service management
+├── skynet_mq.c             # Message queue
+├── skynet_handle.c         # Service handle management
+├── skynet_module.c         # Dynamic module loading
+├── skynet_timer.c          # Timers
+├── skynet_socket.c         # Network I/O
+├── skynet_harbor.c         # Cluster support
+├── skynet_daemon.c         # Daemon process
+├── skynet_log.c            # Logging system
+├── skynet_env.c            # Environment variables
+├── skynet_error.c          # Error handling
+├── socket_server.c         # Socket server
+├── socket_poll.h           # Socket polling abstraction
+├── socket_epoll.h          # epoll implementation
+├── socket_kqueue.h         # kqueue implementation
+├── socket_info.h           # Socket information
+├── socket_buffer.h         # Socket buffer
+├── malloc_hook.c           # Memory allocation hook
+├── mem_info.c              # Memory information
+├── spinlock.h              # Spinlock
+├── rwlock.h                # Read-write lock
+└── atomic.h                # Atomic operations
 ```
 
-#### 核心模块职责
+#### Core Module Responsibilities
 
-| 文件 | 职责 |
+| File | Responsibility |
 |------|------|
-| `skynet_main.c` | 程序入口，解析命令行参数，加载配置 |
-| `skynet_start.c` | 初始化各子系统，创建工作线程 |
-| `skynet_server.c` | 服务的创建、销毁、消息处理 |
-| `skynet_mq.c` | 消息队列的实现 |
-| `skynet_handle.c` | 服务句柄的注册和查找 |
-| `skynet_module.c` | 动态模块（.so）的加载 |
-| `skynet_timer.c` | 定时器的实现 |
-| `skynet_socket.c` | 网络 I/O 的封装 |
-| `skynet_harbor.c` | 跨节点服务调用 |
-| `socket_server.c` | 底层 Socket 操作 |
+| `skynet_main.c` | Program entry point, parses command-line arguments, loads configuration |
+| `skynet_start.c` | Initializes the various subsystems and creates the worker threads |
+| `skynet_server.c` | Creating, destroying, and message handling for services |
+| `skynet_mq.c` | Implementation of the message queue |
+| `skynet_handle.c` | Registration and lookup of service handles |
+| `skynet_module.c` | Loading of dynamic modules (.so) |
+| `skynet_timer.c` | Implementation of timers |
+| `skynet_socket.c` | Wrapping of network I/O |
+| `skynet_harbor.c` | Cross-node service calls |
+| `socket_server.c` | Low-level socket operations |
 
-## Lua 库目录
+## Lua Library Directory
 
 ### lualib/
 
-Skynet 提供的 Lua 库：
+The Lua libraries provided by Skynet:
 
 ```
 lualib/
-├── skynet/                 # 核心模块
-│   ├── skynet.lua          # 主模块
-│   ├── skynet.coroutine.lua # 协程支持
-│   ├── skynet.manager.lua  # 管理功能
-│   ├── skynet.monitor.lua  # 监控功能
-│   ├── skynet.cluster.lua  # 集群支持
-│   └── skynet.harbor.lua   # Harbor 支持
-├── snax.lua                # SNAX 框架
-├── snax_interface.lua      # SNAX 接口
-├── proto.lua               # 协议处理
-├── bson.lua                # BSON 编解码
-├── md5.lua                 # MD5 哈希
-├── netpack.lua             # 网络包处理
-├── socketdriver.lua        # Socket 驱动
-├── sockethelper.lua        # Socket 辅助函数
-├── string                  # 字符串处理
-│   ├── hashkey.lua         # 哈希键
-│   └── urlencode.lua       # URL 编码
-├── debugger.lua            # 调试器
-├── interactive.lua         # 交互式调试
-├── mongo.lua               # MongoDB 客户端
-├── redis.lua               # Redis 客户端
-├── mysql.lua               # MySQL 客户端
-└── http                    # HTTP 支持
-    ├── httpd.lua           # HTTP 服务器
-    ├── httpc.lua           # HTTP 客户端
-    └── websocket.lua       # WebSocket 支持
+├── skynet/                 # Core modules
+│   ├── skynet.lua          # Main module
+│   ├── skynet.coroutine.lua # Coroutine support
+│   ├── skynet.manager.lua  # Manager functions
+│   ├── skynet.monitor.lua  # Monitoring functions
+│   ├── skynet.cluster.lua  # Cluster support
+│   └── skynet.harbor.lua   # Harbor support
+├── snax.lua                # SNAX framework
+├── snax_interface.lua      # SNAX interface
+├── proto.lua               # Protocol handling
+├── bson.lua                # BSON encoding/decoding
+├── md5.lua                 # MD5 hashing
+├── netpack.lua             # Network packet handling
+├── socketdriver.lua        # Socket driver
+├── sockethelper.lua        # Socket helper functions
+├── string                  # String handling
+│   ├── hashkey.lua         # Hash key
+│   └── urlencode.lua       # URL encoding
+├── debugger.lua            # Debugger
+├── interactive.lua         # Interactive debugging
+├── mongo.lua               # MongoDB client
+├── redis.lua               # Redis client
+├── mysql.lua               # MySQL client
+└── http                    # HTTP support
+    ├── httpd.lua           # HTTP server
+    ├── httpc.lua           # HTTP client
+    └── websocket.lua       # WebSocket support
 ```
 
-#### 核心 Lua 模块
+#### Core Lua Modules
 
-**skynet.lua** - 主模块
+**skynet.lua** - Main module
 
 ```lua
 local skynet = require "skynet"
 
--- 核心 API
-skynet.start(func)          -- 启动服务
-skynet.dispatch(type, func) -- 注册消息处理
-skynet.send(addr, type, ...) -- 发送消息
-skynet.call(addr, type, ...) -- 调用并等待结果
-skynet.ret(...)             -- 返回结果
-skynet.newservice(name, ...) -- 创建新服务
-skynet.self()               -- 获取当前服务地址
-skynet.exit()               -- 退出服务
-skynet.timeout(ti, func)    -- 定时器
+-- Core API
+skynet.start(func)          -- Start a service
+skynet.dispatch(type, func) -- Register a message handler
+skynet.send(addr, type, ...) -- Send a message
+skynet.call(addr, type, ...) -- Call and wait for the result
+skynet.ret(...)             -- Return a result
+skynet.newservice(name, ...) -- Create a new service
+skynet.self()               -- Get the current service's address
+skynet.exit()               -- Exit a service
+skynet.timeout(ti, func)    -- Timer
 ```
 
-**skynet.coroutine.lua** - 协程支持
+**skynet.coroutine.lua** - Coroutine support
 
 ```lua
--- 协程操作
-skynet.fcall(addr, type, ...) -- 异步调用
-skynet.wait(co)              -- 等待协程结果
-skynet.wakeup(co)            -- 唤醒协程
-skynet.yield()               -- 让出执行
+-- Coroutine operations
+skynet.fcall(addr, type, ...) -- Asynchronous call
+skynet.wait(co)              -- Wait for a coroutine's result
+skynet.wakeup(co)            -- Wake up a coroutine
+skynet.yield()               -- Yield execution
 ```
 
 ### lualib-src/
 
-Lua 的 C 扩展模块：
+C extension modules for Lua:
 
 ```
 lualib-src/
-├── lua-skynet.c            # Skynet Lua 绑定
-├── lua-seri.c              # 序列化
-├── lua-socket.c            # Socket 绑定
-├── lua-netpack.c           # 网络包处理
-├── lua-mongo.c             # MongoDB 绑定
-├── lua-redis.c             # Redis 绑定
-├── lua-bson.c              # BSON 绑定
-├── lua-md5.c               # MD5 绑定
-├── lua-sharetable.c        # 共享表
-└── lpeg/                   # LPEG 模式匹配
+├── lua-skynet.c            # Skynet Lua binding
+├── lua-seri.c              # Serialization
+├── lua-socket.c            # Socket binding
+├── lua-netpack.c           # Network packet handling
+├── lua-mongo.c             # MongoDB binding
+├── lua-redis.c             # Redis binding
+├── lua-bson.c              # BSON binding
+├── lua-md5.c               # MD5 binding
+├── lua-sharetable.c        # Shared table
+└── lpeg/                   # LPEG pattern matching
     ├── lpeg.c
     └── lpcode.c
 ```
 
-## 服务目录
+## Service Directory
 
 ### service/
 
-Lua 服务实现：
+Lua service implementations:
 
 ```
 service/
-├── service.lua             # 基础服务
-├── logger.lua              # 日志服务
-├── gate.lua                # 网关服务
-├── master.lua              # 主控服务
-├── slave.lua               # 从属服务
-├── harbor.lua              # Harbor 服务
-├── debug_console.lua       # 调试控制台
-├── cmaster.lua             # 集群主控
-├── cslave.lua              # 集群从属
-└── snaxd.lua               # SNAX 服务守护
+├── service.lua             # Base service
+├── logger.lua              # Logging service
+├── gate.lua                # Gateway service
+├── master.lua              # Master control service
+├── slave.lua               # Slave service
+├── harbor.lua              # Harbor service
+├── debug_console.lua       # Debug console
+├── cmaster.lua             # Cluster master
+├── cslave.lua              # Cluster slave
+└── snaxd.lua               # SNAX service daemon
 ```
 
 ### service-src/
 
-C 服务实现：
+C service implementations:
 
 ```
 service-src/
-├── service_logger.c        # 日志服务
-├── service_gate.c          # 网关服务
-├── service_harbor.c        # Harbor 服务
-└── service_master.c        # 主控服务
+├── service_logger.c        # Logging service
+├── service_gate.c          # Gateway service
+├── service_harbor.c        # Harbor service
+└── service_master.c        # Master control service
 ```
 
-## 示例目录
+## Examples Directory
 
 ### examples/
 
-示例配置和脚本：
+Example configurations and scripts:
 
 ```
 examples/
-├── config                  # 配置文件示例
-├── config.test             # 测试配置
-├── config.log              # 日志配置
-├── client.lua              # 客户端示例
-├── main.lua                # 主服务示例
-├── proto.lua               # 协议定义
-├── watchdog.lua            # 看门狗服务
-├── echo.lua                # 回显服务
-├── simpledb.lua            # 简单数据库
-└── login.lua               # 登录服务
+├── config                  # Example configuration file
+├── config.test             # Test configuration
+├── config.log              # Logging configuration
+├── client.lua              # Client example
+├── main.lua                # Main service example
+├── proto.lua               # Protocol definitions
+├── watchdog.lua            # Watchdog service
+├── echo.lua                # Echo service
+├── simpledb.lua            # Simple database
+└── login.lua               # Login service
 ```
 
-#### 配置文件示例
+#### Example Configuration File
 
 ```lua
 -- examples/config
 include "config.path"
 
--- 服务启动配置
-start = "main"  -- 主服务
+-- Service startup configuration
+start = "main"  -- Main service
 
--- 日志配置
+-- Logging configuration
 logpath = "log"
 logservice = "logger"
 
--- 网络配置
+-- Network configuration
 thread = 8
 harbor = 0
 ```
 
-## 测试目录
+## Test Directory
 
 ### test/
 
-测试代码：
+Test code:
 
 ```
 test/
-├── test.lua                # 主测试脚本
-├── teststring.lua          # 字符串测试
-├── testcoroutine.lua       # 协程测试
-├── testsocket.lua          # Socket 测试
-├── testtimer.lua           # 定时器测试
-├── testmemory.lua          # 内存测试
-└── testmulticast.lua       # 组播测试
+├── test.lua                # Main test script
+├── teststring.lua          # String tests
+├── testcoroutine.lua       # Coroutine tests
+├── testsocket.lua          # Socket tests
+├── testtimer.lua           # Timer tests
+├── testmemory.lua          # Memory tests
+└── testmulticast.lua       # Multicast tests
 ```
 
-## 第三方依赖
+## Third-Party Dependencies
 
 ### 3rd/
 
-第三方库：
+Third-party libraries:
 
 ```
 3rd/
-├── lua/                    # Lua 5.5 (修改版)
+├── lua/                    # Lua 5.5 (modified version)
 │   ├── lua-5.5.0/
 │   ├── Makefile
 │   └── ...
-├── jemalloc/               # jemalloc 内存分配器
+├── jemalloc/               # jemalloc memory allocator
 │   ├── jemalloc-5.3.0/
 │   └── Makefile
-├── lpeg/                   # LPEG 模式匹配
+├── lpeg/                   # LPEG pattern matching
 │   ├── lpeg-1.0.2/
 │   └── Makefile
 └── pb/                     # Protocol Buffers
@@ -265,59 +265,59 @@ test/
     └── Makefile
 ```
 
-## 构建产物
+## Build Artifacts
 
-构建后生成的文件：
+Files generated after building:
 
 ```
 skynet/
-├── skynet                  # 主程序
-├── lua                     # Lua 解释器
-├── luac                    # Lua 编译器
-├── cservice/               # C 服务模块
+├── skynet                  # Main program
+├── lua                     # Lua interpreter
+├── luac                    # Lua compiler
+├── cservice/               # C service modules
 │   ├── logger.so
 │   ├── gate.so
 │   ├── harbor.so
 │   └── ...
-├── luaclib/                # Lua C 模块
+├── luaclib/                # Lua C modules
 │   ├── bson.so
 │   ├── md5.so
 │   ├── lpeg.so
 │   └── ...
-└── log/                    # 日志目录
+└── log/                    # Log directory
 ```
 
-## 关键文件说明
+## Key File Descriptions
 
-### 配置文件
+### Configuration Files
 
-**config.path** - 路径配置
+**config.path** - Path configuration
 
 ```lua
--- 服务路径
+-- Service paths
 lua_path = root .. "lualib/?.lua;" .. root .. "lualib/?/init.lua"
 lua_cpath = root .. "luaclib/?.so"
 lua_service = root .. "service/?.lua;" .. root .. "examples/?.lua"
 ```
 
-**config** - 主配置
+**config** - Main configuration
 
 ```lua
--- 启动服务
+-- Startup service
 start = "main"
 
--- 网络配置
+-- Network configuration
 thread = 8
 harbor = 0
 
--- 日志配置
+-- Logging configuration
 logpath = "log"
 logservice = "logger"
 ```
 
-### 协议文件
+### Protocol Files
 
-**proto.lua** - 协议定义
+**proto.lua** - Protocol definitions
 
 ```lua
 local proto = {}
@@ -335,27 +335,27 @@ proto.s2c = skynet.proto_response {
 return proto
 ```
 
-## 开发环境建议
+## Development Environment Recommendations
 
-### 推荐目录结构
+### Recommended Directory Structure
 
-对于实际项目，建议这样的结构：
+For a real project, the following structure is recommended:
 
 ```
 my_game/
-├── skynet/                 # Skynet 框架（作为子模块）
-├── service/                # 游戏服务
-│   ├── game/              # 游戏逻辑
-│   ├── login/             # 登录服务
-│   └── gate/              # 网关服务
-├── lualib/                 # 游戏 Lua 库
-├── proto/                  # 协议定义
-├── config/                 # 配置文件
-└── Makefile                # 构建文件
+├── skynet/                 # Skynet framework (as a submodule)
+├── service/                # Game services
+│   ├── game/              # Game logic
+│   ├── login/             # Login service
+│   └── gate/              # Gateway service
+├── lualib/                 # Game Lua libraries
+├── proto/                  # Protocol definitions
+├── config/                 # Configuration files
+└── Makefile                # Build file
 ```
 
-## 下一步
+## Next Steps
 
-- [核心 API](/getting-started/api-reference) - 学习 Skynet 的核心 API
-- [架构概览](/architecture/overview) - 理解 Skynet 的整体架构
-- [源码分析](/analysis/core-modules) - 深入分析核心源码
+- [Core API](/getting-started/api-reference) - Learn Skynet's core API
+- [Architecture Overview](/architecture/overview) - Understand Skynet's overall architecture
+- [Source Code Analysis](/analysis/core-modules) - Deep dive into the core source code

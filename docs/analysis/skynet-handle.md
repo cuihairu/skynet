@@ -1,71 +1,71 @@
-# skynet_handle.c 源码分析
+# skynet_handle.c Source Code Analysis
 
-`skynet_handle.c` 负责管理服务的句柄映射，是 Skynet 框架的核心组件。在实际项目中，我们发现这个模块的设计对服务查找和管理的效率有直接影响。
+`skynet_handle.c` manages the handle mapping for services, and is a core component of the Skynet framework. In real projects, we found that this module's design directly affects the efficiency of service lookup and management.
 
-## 文件概览
+## File Overview
 
-**职责**：服务句柄管理、名称服务
+**Responsibilities**: Service handle management, name service
 
-**核心数据结构**：
-- `handle_storage` - 句柄存储
-- `handle_name` - 名称映射
-- `handle_reader_slot` - 读锁优化
+**Core Data Structures**:
+- `handle_storage` - Handle storage
+- `handle_name` - Name mapping
+- `handle_reader_slot` - Read lock optimization
 
-**关键函数**：
-- `skynet_handle_register()` - 注册服务
-- `skynet_handle_grab()` - 获取服务
-- `skynet_handle_retire()` - 注销服务
-- `skynet_handle_findname()` - 按名称查找
+**Key Functions**:
+- `skynet_handle_register()` - Register a service
+- `skynet_handle_grab()` - Get a service
+- `skynet_handle_retire()` - Unregister a service
+- `skynet_handle_findname()` - Find by name
 
-## 核心数据结构
+## Core Data Structures
 
-### handle_storage - 句柄存储
+### handle_storage - Handle Storage
 
 ```c
 struct handle_storage {
-    struct rwlock lock;           // 读写锁
+    struct rwlock lock;           // Read-write lock
     uint32_t harbor;             // Harbor ID
-    uint32_t handle_index;       // 句柄索引
-    int slot_size;               // 槽位大小
-    struct skynet_context ** slot; // 服务数组
+    uint32_t handle_index;       // Handle index
+    int slot_size;               // Slot size
+    struct skynet_context ** slot; // Service array
     
-    int name_cap;                // 名称容量
-    int name_count;              // 名称数量
-    struct handle_name *name;    // 名称数组
+    int name_cap;                // Name capacity
+    int name_count;              // Name count
+    struct handle_name *name;    // Name array
     
-    // 分布式读锁优化
-    ATOM_INT thread_idx;         // 线程索引
-    int rslot_count;             // 读槽位数量
-    struct handle_reader_slot *rslots; // 读槽位数组
+    // Distributed read lock optimization
+    ATOM_INT thread_idx;         // Thread index
+    int rslot_count;             // Number of read slots
+    struct handle_reader_slot *rslots; // Array of read slots
 };
 ```
 
-**设计要点**：
+**Design Points**:
 
-1. **哈希表**：使用哈希表存储服务句柄映射
-2. **读写锁**：使用读写锁保证线程安全
-3. **名称服务**：支持按名称查找服务
-4. **分布式读锁**：优化读操作性能
+1. **Hash Table**: Uses a hash table to store service handle mappings
+2. **Read-Write Lock**: Uses a read-write lock to ensure thread safety
+3. **Name Service**: Supports finding services by name
+4. **Distributed Read Lock**: Optimizes read operation performance
 
-### handle_name - 名称映射
+### handle_name - Name Mapping
 
 ```c
 struct handle_name {
-    char * name;      // 服务名称
-    uint32_t handle;  // 服务句柄
+    char * name;      // Service name
+    uint32_t handle;  // Service handle
 };
 ```
 
-### handle_reader_slot - 读锁优化
+### handle_reader_slot - Read Lock Optimization
 
 ```c
 struct handle_reader_slot {
-    ATOM_INT active;  // 是否活跃
-    char _pad[HANDLE_CACHE_LINE - sizeof(ATOM_INT)]; // 缓存行填充
+    ATOM_INT active;  // Whether active
+    char _pad[HANDLE_CACHE_LINE - sizeof(ATOM_INT)]; // Cache line padding
 };
 ```
 
-## 初始化
+## Initialization
 
 ### skynet_handle_init()
 
@@ -74,18 +74,18 @@ void
 skynet_handle_init(int harbor, int thread) {
     assert(H == NULL);
     
-    // 分配存储结构
+    // Allocate the storage structure
     struct handle_storage * s = skynet_malloc(sizeof(*H));
     
-    // 初始化槽位
-    s->slot_size = DEFAULT_SLOT_SIZE;  // 默认 4
+    // Initialize slots
+    s->slot_size = DEFAULT_SLOT_SIZE;  // Default 4
     s->slot = skynet_malloc(s->slot_size * sizeof(struct skynet_context *));
     memset(s->slot, 0, s->slot_size * sizeof(struct skynet_context *));
     
-    // 初始化读写锁
+    // Initialize the read-write lock
     rwlock_init(&s->lock);
     
-    // 初始化分布式读槽位
+    // Initialize distributed read slots
     // workers + monitor + timer + socket
     s->rslot_count = thread + 3;
     size_t rslot_sz = (size_t)s->rslot_count * sizeof(struct handle_reader_slot);
@@ -93,13 +93,13 @@ skynet_handle_init(int harbor, int thread) {
     memset(s->rslots, 0, rslot_sz);
     ATOM_INIT(&s->thread_idx, 0);
     
-    // 设置 Harbor ID
+    // Set the Harbor ID
     s->harbor = (uint32_t)(harbor & 0xff) << HANDLE_REMOTE_SHIFT;
     
-    // 初始化句柄索引（0 保留给系统）
+    // Initialize the handle index (0 is reserved for the system)
     s->handle_index = 1;
     
-    // 初始化名称数组
+    // Initialize the name array
     s->name_cap = 2;
     s->name_count = 0;
     s->name = skynet_malloc(s->name_cap * sizeof(struct handle_name));
@@ -108,11 +108,11 @@ skynet_handle_init(int harbor, int thread) {
 }
 ```
 
-**初始化状态**：
+**Initial State**:
 
 ```mermaid
 graph TB
-    subgraph 句柄存储初始状态
+    subgraph "Initial Handle Storage State"
         A[harbor: harbor << 24]
         B[handle_index: 1]
         C[slot_size: 4]
@@ -123,48 +123,48 @@ graph TB
     end
 ```
 
-## 句柄管理
+## Handle Management
 
-### 1. 注册句柄 - skynet_handle_register()
+### 1. Register a Handle - skynet_handle_register()
 
 ```c
 uint32_t
 skynet_handle_register(struct skynet_context *ctx) {
     struct handle_storage *s = H;
     
-    handle_wlock(s);  // 写锁
+    handle_wlock(s);  // Write lock
     
     for (;;) {
         int i;
         uint32_t handle = s->handle_index;
         
-        // 1. 查找空闲槽位
+        // 1. Find a free slot
         for (i = 0; i < s->slot_size; i++, handle++) {
             if (handle > HANDLE_MASK) {
-                // 句柄溢出，从 1 开始
+                // Handle overflow, restart from 1
                 handle = 1;
             }
             
             int hash = handle & (s->slot_size - 1);
             if (s->slot[hash] == NULL) {
-                // 2. 找到空闲槽位，注册服务
+                // 2. Found a free slot, register the service
                 s->slot[hash] = ctx;
                 s->handle_index = handle + 1;
                 
                 handle_wunlock(s);
                 
-                // 3. 添加 Harbor ID
+                // 3. Add the Harbor ID
                 handle |= s->harbor;
                 return handle;
             }
         }
         
-        // 4. 没有空闲槽位，扩展数组
+        // 4. No free slot, expand the array
         assert((s->slot_size * 2 - 1) <= HANDLE_MASK);
         struct skynet_context ** new_slot = skynet_malloc(s->slot_size * 2 * sizeof(struct skynet_context *));
         memset(new_slot, 0, s->slot_size * 2 * sizeof(struct skynet_context *));
         
-        // 5. 重新哈希
+        // 5. Rehash
         for (i = 0; i < s->slot_size; i++) {
             if (s->slot[i]) {
                 int hash = skynet_context_handle(s->slot[i]) & (s->slot_size * 2 - 1);
@@ -173,7 +173,7 @@ skynet_handle_register(struct skynet_context *ctx) {
             }
         }
         
-        // 6. 替换旧数组
+        // 6. Replace the old array
         skynet_free(s->slot);
         s->slot = new_slot;
         s->slot_size *= 2;
@@ -181,25 +181,25 @@ skynet_handle_register(struct skynet_context *ctx) {
 }
 ```
 
-**注册流程**：
+**Registration Flow**:
 
 ```mermaid
 graph TB
-    Start[skynet_handle_register<br/>ctx] --> A[写锁<br/>handle_wlock]
-    A --> B[查找空闲槽位<br/>遍历 slot 数组]
-    B --> C{找到?}
+    Start[skynet_handle_register<br/>ctx] --> A[Write lock<br/>handle_wlock]
+    A --> B[Find a free slot<br/>Traverse the slot array]
+    B --> C{Found?}
     
-    C -->|是| D[注册服务]
-    C -->|否| E[扩展数组]
+    C -->|Yes| D[Register the service]
+    C -->|No| E[Expand the array]
     
-    D --> F[解锁<br/>handle_wunlock]
-    E --> G[重新哈希]
+    D --> F[Unlock<br/>handle_wunlock]
+    E --> G[Rehash]
     G --> B
     
-    F --> H[返回句柄]
+    F --> H[Return the handle]
 ```
 
-### 2. 获取服务 - skynet_handle_grab()
+### 2. Get a Service - skynet_handle_grab()
 
 ```c
 struct skynet_context *
@@ -207,42 +207,42 @@ skynet_handle_grab(uint32_t handle) {
     struct handle_storage *s = H;
     struct skynet_context * result = NULL;
     
-    handle_rlock(s);  // 读锁
+    handle_rlock(s);  // Read lock
     
-    // 1. 计算哈希值
+    // 1. Compute the hash value
     uint32_t hash = handle & (s->slot_size - 1);
     struct skynet_context * ctx = s->slot[hash];
     
-    // 2. 检查句柄是否匹配
+    // 2. Check whether the handle matches
     if (ctx && skynet_context_handle(ctx) == handle) {
         result = ctx;
-        skynet_context_grab(result);  // 增加引用计数
+        skynet_context_grab(result);  // Increment the reference count
     }
     
-    handle_runlock(s);  // 释放读锁
+    handle_runlock(s);  // Release the read lock
     
     return result;
 }
 ```
 
-**获取流程**：
+**Grab Flow**:
 
 ```mermaid
 graph TB
-    Start[skynet_handle_grab<br/>handle] --> A[读锁<br/>handle_rlock]
-    A --> B[计算哈希值<br/>hash = handle & slot_size-1]
-    B --> C[检查匹配<br/>ctx->handle == handle?]
+    Start[skynet_handle_grab<br/>handle] --> A[Read lock<br/>handle_rlock]
+    A --> B[Compute the hash value<br/>hash = handle & slot_size-1]
+    B --> C[Check the match<br/>ctx->handle == handle?]
     
-    C -->|匹配| D[grab ctx<br/>增加引用计数]
-    C -->|不匹配| E[返回 NULL]
+    C -->|Match| D[grab ctx<br/>Increment the reference count]
+    C -->|No match| E[Return NULL]
     
-    D --> F[返回 ctx]
+    D --> F[Return ctx]
     
-    F --> G[释放读锁<br/>handle_runlock]
+    F --> G[Release the read lock<br/>handle_runlock]
     E --> G
 ```
 
-### 3. 注销句柄 - skynet_handle_retire()
+### 3. Retire a Handle - skynet_handle_retire()
 
 ```c
 int
@@ -250,19 +250,19 @@ skynet_handle_retire(uint32_t handle) {
     int ret = 0;
     struct handle_storage *s = H;
     
-    handle_wlock(s);  // 写锁
+    handle_wlock(s);  // Write lock
     
-    // 1. 计算哈希值
+    // 1. Compute the hash value
     uint32_t hash = handle & (s->slot_size - 1);
     struct skynet_context * ctx = s->slot[hash];
     
-    // 2. 检查句柄是否匹配
+    // 2. Check whether the handle matches
     if (ctx != NULL && skynet_context_handle(ctx) == handle) {
-        // 3. 清空槽位
+        // 3. Clear the slot
         s->slot[hash] = NULL;
         ret = 1;
         
-        // 4. 删除相关名称
+        // 4. Remove related names
         int i;
         int j = 0, n = s->name_count;
         for (i = 0; i < n; ++i) {
@@ -279,9 +279,9 @@ skynet_handle_retire(uint32_t handle) {
         ctx = NULL;
     }
     
-    handle_wunlock(s);  // 释放写锁
+    handle_wunlock(s);  // Release the write lock
     
-    // 5. 释放上下文（在锁外释放，避免死锁）
+    // 5. Release the context (release outside the lock to avoid a deadlock)
     if (ctx) {
         skynet_context_release(ctx);
     }
@@ -290,22 +290,22 @@ skynet_handle_retire(uint32_t handle) {
 }
 ```
 
-**注销流程**：
+**Retire Flow**:
 
 ```mermaid
 graph TD
-    A[skynet_handle_retire<br/>handle] --> B[写锁<br/>handle_wlock]
-    B --> C[查找服务<br/>hash = handle & slot_size - 1]
-    C --> D{找到?}
-    D -->|是| E[清空槽位]
-    D -->|否| F[返回 0]
-    E --> G[删除相关名称]
-    G --> H[解锁]
-    H --> I[释放上下文]
-    I --> J[返回 1]
+    A[skynet_handle_retire<br/>handle] --> B[Write lock<br/>handle_wlock]
+    B --> C[Find the service<br/>hash = handle & slot_size - 1]
+    C --> D{Found?}
+    D -->|Yes| E[Clear the slot]
+    D -->|No| F[Return 0]
+    E --> G[Remove related names]
+    G --> H[Unlock]
+    H --> I[Release the context]
+    I --> J[Return 1]
 ```
 
-### 4. 注销所有 - skynet_handle_retireall()
+### 4. Retire All - skynet_handle_retireall()
 
 ```c
 void
@@ -339,20 +339,20 @@ skynet_handle_retireall() {
 }
 ```
 
-## 名称服务
+## Name Service
 
-### 1. 查找名称 - skynet_handle_findname()
+### 1. Find a Name - skynet_handle_findname()
 
 ```c
 uint32_t
 skynet_handle_findname(const char * name) {
     struct handle_storage *s = H;
     
-    handle_rlock(s);  // 读锁
+    handle_rlock(s);  // Read lock
     
     uint32_t handle = 0;
     
-    // 二分查找
+    // Binary search
     int begin = 0;
     int end = s->name_count - 1;
     
@@ -373,40 +373,40 @@ skynet_handle_findname(const char * name) {
         }
     }
     
-    handle_runlock(s);  // 释放读锁
+    handle_runlock(s);  // Release the read lock
     
     return handle;
 }
 ```
 
-**查找流程**：
+**Lookup Flow**:
 
 ```mermaid
 graph TD
-    A[skynet_handle_findname<br/>name] --> B[读锁<br/>handle_rlock]
-    B --> C[二分查找<br/>在有序数组中查找]
-    C --> D{找到?}
-    D -->|是| E[返回 handle]
-    D -->|否| F[返回 0]
+    A[skynet_handle_findname<br/>name] --> B[Read lock<br/>handle_rlock]
+    B --> C[Binary search<br/>Search in the sorted array]
+    C --> D{Found?}
+    D -->|Yes| E[Return handle]
+    D -->|No| F[Return 0]
 ```
 
-### 2. 注册名称 - skynet_handle_namehandle()
+### 2. Register a Name - skynet_handle_namehandle()
 
 ```c
 const char *
 skynet_handle_namehandle(uint32_t handle, const char *name) {
-    handle_wlock(H);  // 写锁
+    handle_wlock(H);  // Write lock
     
     const char * ret = _insert_name(H, name, handle);
     
-    handle_wunlock(H);  // 释放写锁
+    handle_wunlock(H);  // Release the write lock
     
     return ret;
 }
 
 static const char *
 _insert_name(struct handle_storage *s, const char * name, uint32_t handle) {
-    // 1. 二分查找插入位置
+    // 1. Binary search for the insertion position
     int begin = 0;
     int end = s->name_count - 1;
     
@@ -416,7 +416,7 @@ _insert_name(struct handle_storage *s, const char * name, uint32_t handle) {
         int c = strcmp(n->name, name);
         
         if (c == 0) {
-            // 名称已存在
+            // The name already exists
             return NULL;
         }
         
@@ -427,41 +427,41 @@ _insert_name(struct handle_storage *s, const char * name, uint32_t handle) {
         }
     }
     
-    // 2. 复制名称
+    // 2. Copy the name
     char * result = skynet_strdup(name);
     
-    // 3. 插入到有序数组
+    // 3. Insert into the sorted array
     _insert_name_before(s, result, handle, begin);
     
     return result;
 }
 ```
 
-**插入流程**：
+**Insertion Flow**:
 
 ```mermaid
 graph TD
-    A[_insert_name<br/>s, name, handle] --> B[二分查找位置<br/>查找插入位置]
-    B --> C{位置已存在?}
-    C -->|是| D[返回 NULL]
-    C -->|否| E[复制名称]
-    E --> F[插入到有序数组]
-    F --> G[返回名称指针]
+    A[_insert_name<br/>s, name, handle] --> B[Binary search the position<br/>Find the insertion position]
+    B --> C{Position already exists?}
+    C -->|Yes| D[Return NULL]
+    C -->|No| E[Copy the name]
+    E --> F[Insert into the sorted array]
+    F --> G[Return the name pointer]
 ```
 
-### 3. 插入名称 - _insert_name_before()
+### 3. Insert a Name - _insert_name_before()
 
 ```c
 static void
 _insert_name_before(struct handle_storage *s, char *name, uint32_t handle, int before) {
     if (s->name_count >= s->name_cap) {
-        // 1. 扩展数组
+        // 1. Expand the array
         s->name_cap *= 2;
         assert(s->name_cap <= MAX_SLOT_SIZE);
         
         struct handle_name * n = skynet_malloc(s->name_cap * sizeof(struct handle_name));
         
-        // 2. 复制数据
+        // 2. Copy the data
         int i;
         for (i = 0; i < before; i++) {
             n[i] = s->name[i];
@@ -470,48 +470,48 @@ _insert_name_before(struct handle_storage *s, char *name, uint32_t handle, int b
             n[i+1] = s->name[i];
         }
         
-        // 3. 释放旧数组
+        // 3. Free the old array
         skynet_free(s->name);
         s->name = n;
     } else {
-        // 4. 移动数据
+        // 4. Move the data
         int i;
         for (i = s->name_count; i > before; i--) {
             s->name[i] = s->name[i-1];
         }
     }
     
-    // 5. 插入新数据
+    // 5. Insert the new data
     s->name[before].name = name;
     s->name[before].handle = handle;
     s->name_count++;
 }
 ```
 
-## 读锁优化
+## Read Lock Optimization
 
-### 分布式读锁
+### Distributed Read Lock
 
 ```c
 static inline void
 handle_rlock(struct handle_storage *s) {
     if (TLS_SLOT_IDX >= 0 && TLS_SLOT_IDX < s->rslot_count) {
-        // 使用分布式读槽位
+        // Use the distributed read slot
         for (;;) {
             ATOM_STORE(&s->rslots[TLS_SLOT_IDX].active, 1);
             
             if (!ATOM_LOAD(&s->lock.write)) {
-                break;  // 没有写者，获取锁成功
+                break;  // No writer, the lock was acquired successfully
             }
             
-            // 有写者，退避
+            // A writer exists, back off
             ATOM_STORE(&s->rslots[TLS_SLOT_IDX].active, 0);
             while (ATOM_LOAD(&s->lock.write)) {
                 atomic_pause_();
             }
         }
     } else {
-        // 使用普通读写锁
+        // Use the ordinary read-write lock
         rwlock_rlock(&s->lock);
     }
 }
@@ -519,23 +519,23 @@ handle_rlock(struct handle_storage *s) {
 static inline void
 handle_runlock(struct handle_storage *s) {
     if (TLS_SLOT_IDX >= 0 && TLS_SLOT_IDX < s->rslot_count) {
-        // 清除分布式读槽位
+        // Clear the distributed read slot
         ATOM_STORE(&s->rslots[TLS_SLOT_IDX].active, 0);
     } else {
-        // 释放普通读写锁
+        // Release the ordinary read-write lock
         rwlock_runlock(&s->lock);
     }
 }
 ```
 
-### 写锁等待读锁
+### Writer Waits for Readers
 
 ```c
 static inline void
 handle_wlock(struct handle_storage *s) {
     rwlock_wlock(&s->lock);
     
-    // 等待所有读槽位完成
+    // Wait for all read slots to finish
     for (int i = 0; i < s->rslot_count; i++) {
         while (ATOM_LOAD(&s->rslots[i].active)) {
             atomic_pause_();
@@ -544,7 +544,7 @@ handle_wlock(struct handle_storage *s) {
 }
 ```
 
-### 线程注册
+### Thread Registration
 
 ```c
 void
@@ -556,51 +556,51 @@ skynet_handle_register_thread(void) {
 }
 ```
 
-## 线程安全
+## Thread Safety
 
-### 读写锁使用
+### Read-Write Lock Usage
 
 ```c
-// 读操作
+// Read operations
 handle_rlock(s);
-// ... 读操作 ...
+// ... read operations ...
 handle_runlock(s);
 
-// 写操作
+// Write operations
 handle_wlock(s);
-// ... 写操作 ...
+// ... write operations ...
 handle_wunlock(s);
 ```
 
-### 原子操作
+### Atomic Operations
 
 ```c
-// 分布式读槽位
+// Distributed read slot
 ATOM_INT active;
 ATOM_STORE(&s->rslots[TLS_SLOT_IDX].active, 1);
 ATOM_LOAD(&s->rslots[TLS_SLOT_IDX].active);
 ```
 
-## 哈希表设计
+## Hash Table Design
 
-### 哈希函数
+### Hash Function
 
 ```c
 int hash = handle & (s->slot_size - 1);
 ```
 
-### 冲突解决
+### Conflict Resolution
 
-使用开放寻址法，线性探测。
+Uses open addressing with linear probing.
 
-### 动态扩展
+### Dynamic Expansion
 
 ```c
-// 扩展数组
+// Expand the array
 struct skynet_context ** new_slot = skynet_malloc(s->slot_size * 2 * sizeof(struct skynet_context *));
 memset(new_slot, 0, s->slot_size * 2 * sizeof(struct skynet_context *));
 
-// 重新哈希
+// Rehash
 for (i = 0; i < s->slot_size; i++) {
     if (s->slot[i]) {
         int hash = skynet_context_handle(s->slot[i]) & (s->slot_size * 2 - 1);
@@ -609,31 +609,31 @@ for (i = 0; i < s->slot_size; i++) {
     }
 }
 
-// 替换旧数组
+// Replace the old array
 skynet_free(s->slot);
 s->slot = new_slot;
 s->slot_size *= 2;
 ```
 
-## 与其他模块的交互
+## Interaction with Other Modules
 
-### 与 skynet_server.c 的交互
+### Interaction with skynet_server.c
 
 ```c
-// 注册服务
+// Register a service
 ctx->handle = skynet_handle_register(ctx);
 
-// 获取服务
+// Get a service
 struct skynet_context *ctx = skynet_handle_grab(handle);
 
-// 注销服务
+// Unregister a service
 skynet_handle_retire(handle);
 ```
 
-### 与 skynet_mq.c 的交互
+### Interaction with skynet_mq.c
 
 ```c
-// 通过句柄查找服务
+// Look up a service by handle
 struct skynet_context *ctx = skynet_handle_grab(handle);
 if (ctx) {
     skynet_mq_push(ctx->queue, message);
@@ -641,29 +641,29 @@ if (ctx) {
 }
 ```
 
-## 关键设计决策
+## Key Design Decisions
 
-### 1. 为什么使用哈希表？
+### 1. Why Use a Hash Table?
 
-- **O(1) 查找**：通过句柄快速查找服务
-- **内存效率**：只存储有服务的槽位
-- **动态扩展**：根据需要自动扩展
+- **O(1) Lookup**: Quickly look up a service by handle
+- **Memory Efficiency**: Only store slots that hold a service
+- **Dynamic Expansion**: Expand automatically as needed
 
-### 2. 为什么使用读写锁？
+### 2. Why Use a Read-Write Lock?
 
-- **读多写少**：服务查找远多于注册/注销
-- **并发读**：多个线程可以同时读
-- **写独占**：写操作需要独占访问
+- **More Reads Than Writes**: Service lookups far outnumber registrations/retirements
+- **Concurrent Reads**: Multiple threads can read simultaneously
+- **Exclusive Writes**: Write operations require exclusive access
 
-### 3. 为什么使用分布式读锁？
+### 3. Why Use a Distributed Read Lock?
 
-- **减少竞争**：每个线程有自己的读槽位
-- **缓存友好**：读槽位填充到缓存行
-- **无锁读**：读操作不需要获取全局锁
+- **Reduced Contention**: Each thread has its own read slot
+- **Cache Friendly**: Read slots are padded to a cache line
+- **Lock-Free Reads**: Read operations do not need to acquire a global lock
 
-## 性能优化
+## Performance Optimizations
 
-### 1. 缓存行填充
+### 1. Cache Line Padding
 
 ```c
 struct handle_reader_slot {
@@ -672,33 +672,33 @@ struct handle_reader_slot {
 };
 ```
 
-### 2. 二分查找
+### 2. Binary Search
 
-名称查找使用二分查找，O(log n) 复杂度。
+Name lookups use binary search with O(log n) complexity.
 
-### 3. 批量操作
+### 3. Batch Operations
 
 ```c
-// 批量注销
+// Batch retirement
 skynet_handle_retireall();
 ```
 
-## 常见问题
+## Common Questions
 
-### 1. 句柄溢出怎么办？
+### 1. What to Do About Handle Overflow?
 
-句柄会回绕到 1，继续查找空闲槽位。
+The handle wraps back to 1 and keeps searching for a free slot.
 
-### 2. 名称重复怎么办？
+### 2. What to Do About Duplicate Names?
 
-插入重复名称会返回 NULL。
+Inserting a duplicate name returns NULL.
 
-### 3. 如何保证线程安全？
+### 3. How Is Thread Safety Guaranteed?
 
-使用读写锁和分布式读锁优化。
+By using a read-write lock together with the distributed read lock optimization.
 
-## 下一步
+## Next Steps
 
-- [skynet_timer.c 分析](/analysis/skynet-timer) - 定时器的实现
-- [socket_server.c 分析](/analysis/socket-server) - 网络 I/O 的实现
-- [服务与模块](/architecture/service-module) - 服务管理的设计
+- [skynet_timer.c Analysis](/analysis/skynet-timer) - Timer implementation
+- [socket_server.c Analysis](/analysis/socket-server) - Network I/O implementation
+- [Services and Modules](/architecture/service-module) - Service management design

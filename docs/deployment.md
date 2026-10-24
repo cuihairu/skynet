@@ -1,50 +1,50 @@
-# 部署指南
+# Deployment Guide
 
-本文档介绍如何将 Skynet 源码解析文档部署到各种平台。
+This document describes how to deploy the Skynet source code analysis documentation to various platforms.
 
-## 本地开发
+## Local Development
 
-### 启动开发服务器
+### Starting the Development Server
 
 ```bash
-# 安装依赖
+# Install dependencies
 npm install
 
-# 启动开发服务器
+# Start the development server
 npm run docs:dev
 ```
 
-访问 http://localhost:5173/skynet/ 查看文档。
+Visit http://localhost:5173/skynet/ to view the documentation.
 
-### 使用快速启动脚本
+### Using the Quick Start Script
 
 ```bash
 ./docs.sh
 ```
 
-## 构建生产版本
+## Building the Production Version
 
 ```bash
-# 构建
+# Build
 npm run docs:build
 
-# 预览构建结果
+# Preview the build result
 npm run docs:preview
 ```
 
-构建产物位于 `docs/.vitepress/dist/` 目录。
+The build output is located in the `docs/.vitepress/dist/` directory.
 
 ## GitHub Pages
 
-### 1. 启用 GitHub Pages
+### 1. Enable GitHub Pages
 
-1. 进入仓库设置 (Settings)
-2. 找到 Pages 选项
-3. 选择 Source 为 "GitHub Actions"
+1. Go to the repository Settings
+2. Find the Pages option
+3. Set Source to "GitHub Actions"
 
-### 2. 创建 GitHub Actions 工作流
+### 2. Create a GitHub Actions Workflow
 
-创建 `.github/workflows/deploy.yml`：
+Create `.github/workflows/deploy.yml`:
 
 ```yaml
 name: Deploy Docs
@@ -79,7 +79,7 @@ jobs:
           publish_dir: docs/.vitepress/dist
 ```
 
-### 3. 推送代码
+### 3. Push the Code
 
 ```bash
 git add .
@@ -87,170 +87,170 @@ git commit -m "Add docs deployment"
 git push origin master
 ```
 
-文档将自动部署到 `https://<username>.github.io/skynet/`。
+The documentation will be automatically deployed to `https://<username>.github.io/skynet/`.
 
 ## Vercel
 
-### 1. 连接仓库
+### 1. Connect the Repository
 
-1. 访问 [vercel.com](https://vercel.com)
-2. 点击 "New Project"
-3. 导入 GitHub 仓库
+1. Visit [vercel.com](https://vercel.com)
+2. Click "New Project"
+3. Import your GitHub repository
 
-### 2. 配置项目
+### 2. Configure the Project
 
 - **Framework Preset**: VitePress
 - **Build Command**: `npm run docs:build`
 - **Output Directory**: `docs/.vitepress/dist`
 - **Install Command**: `npm install`
 
-### 3. 部署
+### 3. Deploy
 
-点击 "Deploy" 按钮即可完成部署。
+Click the "Deploy" button to complete the deployment.
 
 ## Netlify
 
-### 1. 连接仓库
+### 1. Connect the Repository
 
-1. 访问 [netlify.com](https://netlify.com)
-2. 点击 "New site from Git"
-3. 选择 GitHub 仓库
+1. Visit [netlify.com](https://netlify.com)
+2. Click "New site from Git"
+3. Select your GitHub repository
 
-### 2. 配置构建
+### 2. Configure the Build
 
 - **Build command**: `npm run docs:build`
 - **Publish directory**: `docs/.vitepress/dist`
 
-### 3. 部署
+### 3. Deploy
 
-点击 "Deploy site" 按钮即可完成部署。
+Click the "Deploy site" button to complete the deployment.
 
 ## Cloudflare Pages
 
-### 1. 连接仓库
+### 1. Connect the Repository
 
-1. 访问 Cloudflare Dashboard
-2. 进入 Pages
-3. 点击 "Create a project"
-4. 连接 GitHub 仓库
+1. Visit the Cloudflare Dashboard
+2. Go to Pages
+3. Click "Create a project"
+4. Connect your GitHub repository
 
-### 2. 配置构建
+### 2. Configure the Build
 
 - **Production branch**: `master`
 - **Build command**: `npm run docs:build`
 - **Build output directory**: `docs/.vitepress/dist`
 
-### 3. 部署
+### 3. Deploy
 
-点击 "Save and Deploy" 按钮即可完成部署。
+Click the "Save and Deploy" button to complete the deployment.
 
-## 自定义域名
+## Custom Domains
 
 ### GitHub Pages
 
-1. 在仓库设置中找到 Pages 选项
-2. 输入自定义域名
-3. 配置 DNS CNAME 记录指向 `<username>.github.io`
+1. Find the Pages option in the repository settings
+2. Enter your custom domain
+3. Configure a DNS CNAME record pointing to `<username>.github.io`
 
 ### Vercel
 
-1. 在项目设置中找到 Domains
-2. 添加自定义域名
-3. 配置 DNS 记录
+1. Find Domains in the project settings
+2. Add your custom domain
+3. Configure DNS records
 
 ### Netlify
 
-1. 在站点设置中找到 Domain management
-2. 添加自定义域名
-3. 配置 DNS 记录
+1. Find Domain management in the site settings
+2. Add your custom domain
+3. Configure DNS records
 
-## 部署脚本
+## Deployment Scripts
 
-### 部署到 GitHub Pages
+### Deploying to GitHub Pages
 
 ```bash
 #!/bin/bash
 
-# 构建文档
+# Build the documentation
 npm run docs:build
 
-# 进入构建目录
+# Enter the build directory
 cd docs/.vitepress/dist
 
-# 初始化 Git
+# Initialize Git
 git init
 git add -A
 git commit -m 'deploy'
 
-# 推送到 gh-pages 分支
+# Push to the gh-pages branch
 git push -f git@github.com:<username>/skynet.git master:gh-pages
 
 cd -
 ```
 
-### 部署到 Netlify
+### Deploying to Netlify
 
 ```bash
 #!/bin/bash
 
-# 构建文档
+# Build the documentation
 npm run docs:build
 
-# 使用 Netlify CLI 部署
+# Deploy using the Netlify CLI
 npx netlify deploy --prod --dir=docs/.vitepress/dist
 ```
 
-## 部署检查清单
+## Deployment Checklist
 
-- [ ] 文档能在本地正常构建
-- [ ] 所有链接都能正常访问
-- [ ] 图片和静态资源能正常加载
-- [ ] 移动端显示正常
-- [ ] 搜索功能正常工作
-- [ ] 代码高亮正常显示
-- [ ] Mermaid 图表正常渲染
+- [ ] The documentation builds correctly locally
+- [ ] All links are accessible
+- [ ] Images and static assets load correctly
+- [ ] Mobile display works correctly
+- [ ] Search functionality works
+- [ ] Code highlighting displays correctly
+- [ ] Mermaid diagrams render correctly
 
-## 常见问题
+## Frequently Asked Questions
 
-### 1. 资源加载失败
+### 1. Asset Loading Failure
 
-检查 `base` 配置是否正确：
+Check whether the `base` configuration is correct:
 
 ```js
 // docs/.vitepress/config.mjs
 export default {
-  base: "/skynet/",  // 确保与部署路径一致
+  base: "/skynet/",  // Make sure it matches the deployment path
 }
 ```
 
-### 2. 404 错误
+### 2. 404 Errors
 
-确保 `cleanUrls` 配置正确：
+Ensure the `cleanUrls` configuration is correct:
 
 ```js
 export default {
-  cleanUrls: false,  // 根据平台调整
+  cleanUrls: false,  // Adjust according to the platform
 }
 ```
 
-### 3. 样式问题
+### 3. Styling Issues
 
-清除缓存后重新构建：
+Clear the cache and rebuild:
 
 ```bash
 rm -rf docs/.vitepress/cache
 npm run docs:build
 ```
 
-## 性能优化
+## Performance Optimization
 
-### 1. 启用压缩
+### 1. Enable Compression
 
-Vercel 和 Netlify 默认启用 gzip 压缩。
+Vercel and Netlify enable gzip compression by default.
 
-### 2. 配置缓存
+### 2. Configure Caching
 
-在部署平台配置静态资源缓存：
+Configure static asset caching on the deployment platform:
 
 ```
 # Netlify _headers
@@ -258,15 +258,15 @@ Vercel 和 Netlify 默认启用 gzip 压缩。
   Cache-Control: public, max-age=31536000
 ```
 
-### 3. 使用 CDN
+### 3. Use a CDN
 
-部署平台通常自带 CDN，无需额外配置。
+Deployment platforms usually come with a CDN; no extra configuration is needed.
 
-## 监控与分析
+## Monitoring and Analytics
 
 ### 1. Google Analytics
 
-在 `.vitepress/config.mjs` 中添加：
+Add the following to `.vitepress/config.mjs`:
 
 ```js
 export default {
@@ -282,12 +282,12 @@ export default {
 }
 ```
 
-### 2. 百度统计
+### 2. Baidu Analytics
 
-类似地添加百度统计代码。
+Similarly add Baidu Analytics code.
 
-## 下一步
+## Next Steps
 
-- [本地开发](#本地开发) - 在本地运行文档
-- [GitHub Pages](#github-pages) - 部署到 GitHub Pages
-- [Vercel](#vercel) - 部署到 Vercel
+- [Local Development](#local-development) - Run the documentation locally
+- [GitHub Pages](#github-pages) - Deploy to GitHub Pages
+- [Vercel](#vercel) - Deploy to Vercel

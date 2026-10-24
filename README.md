@@ -34,11 +34,13 @@ npm run docs:dev
 
 ### 文档内容
 
-- [架构概览](docs/architecture/overview.md) - 整体架构设计
-- [Actor 模型](docs/architecture/actor-model.md) - 核心设计范式
-- [消息驱动设计](docs/architecture/message-driven.md) - 消息系统设计
-- [服务与模块](docs/architecture/service-module.md) - 服务管理机制
-- [核心模块概览](docs/analysis/core-modules.md) - C 核心模块分析
+- [架构概览](docs/zh/architecture/overview.md) - 整体架构设计
+- [Actor 模型](docs/zh/architecture/actor-model.md) - 核心设计范式
+- [消息驱动设计](docs/zh/architecture/message-driven.md) - 消息系统设计
+- [服务与模块](docs/zh/architecture/service-module.md) - 服务管理机制
+- [核心模块概览](docs/zh/analysis/core-modules.md) - C 核心模块分析
+
+英文文档在 `docs/` 根目录下同名路径，中文文档在 `docs/zh/` 下。
 
 ## Build
 

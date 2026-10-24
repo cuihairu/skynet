@@ -1,87 +1,87 @@
-# Skynet 源码解析文档
+# Skynet Source Code Analysis Documentation
 
-这是 Skynet 游戏服务器框架的源码解析文档，使用 VitePress 构建。
+This is the source code analysis documentation for the Skynet game server framework, built with VitePress.
 
-## 本地开发
+## Local Development
 
-### 安装依赖
+### Installing Dependencies
 
 ```bash
 npm install
 ```
 
-### 启动开发服务器
+### Starting the Development Server
 
 ```bash
 npm run docs:dev
 ```
 
-访问 http://localhost:5173/skynet/ 查看文档。
+Visit http://localhost:5173/skynet/ to view the documentation.
 
-### 构建生产版本
+### Building the Production Version
 
 ```bash
 npm run docs:build
 ```
 
-### 预览生产版本
+### Previewing the Production Version
 
 ```bash
 npm run docs:preview
 ```
 
-## 文档结构
+## Documentation Structure
 
 ```
 docs/
-├── index.md                    # 首页
-├── getting-started/            # 快速开始
+├── index.md                    # Home page
+├── getting-started/            # Getting started
 │   └── index.md
-├── architecture/               # 架构解析
-│   ├── overview.md            # 架构概览
-│   ├── actor-model.md         # Actor 模型
+├── architecture/               # Architecture analysis
+│   ├── overview.md            # Architecture overview
+│   ├── actor-model.md         # Actor model
 │   └── ...
-├── analysis/                   # 源码分析
-│   ├── core-modules.md        # 核心模块概览
-│   ├── skynet-server.md       # skynet_server.c 分析
+├── analysis/                   # Source code analysis
+│   ├── core-modules.md        # Core modules overview
+│   ├── skynet-server.md       # skynet_server.c analysis
 │   └── ...
-├── public/                     # 静态资源
+├── public/                     # Static assets
 │   └── logo.svg
-└── .vitepress/                 # VitePress 配置
-    ├── config.mjs             # 主配置文件
-    └── theme/                 # 自定义主题
+└── .vitepress/                 # VitePress configuration
+    ├── config.mjs             # Main config file
+    └── theme/                 # Custom theme
         ├── index.js
         ├── style.css
         └── components/
             └── MermaidDiagram.vue
 ```
 
-## 添加新文档
+## Adding New Documentation
 
-1. 在相应目录下创建 `.md` 文件
-2. 在 `docs/.vitepress/config.mjs` 的 sidebar 中添加链接
-3. 使用 Markdown 语法编写内容
+1. Create a `.md` file in the appropriate directory
+2. Add a link in the sidebar of `docs/.vitepress/config.mjs`
+3. Write content using Markdown syntax
 
-## 部署
+## Deployment
 
-文档可以部署到 GitHub Pages、Vercel、Netlify 等平台。
+The documentation can be deployed to platforms such as GitHub Pages, Vercel, and Netlify.
 
 ### GitHub Pages
 
-1. 在仓库设置中启用 GitHub Pages
-2. 选择 `gh-pages` 分支或 `docs/` 目录
-3. 推送代码后会自动部署
+1. Enable GitHub Pages in the repository settings
+2. Select the `gh-pages` branch or the `docs/` directory
+3. It will deploy automatically after you push code
 
 ### Vercel/Netlify
 
-1. 连接 GitHub 仓库
-2. 设置构建命令为 `npm run docs:build`
-3. 设置输出目录为 `docs/.vitepress/dist`
+1. Connect your GitHub repository
+2. Set the build command to `npm run docs:build`
+3. Set the output directory to `docs/.vitepress/dist`
 
-## 贡献
+## Contributing
 
-欢迎提交 Pull Request 来完善文档！
+Pull Requests to improve the documentation are welcome!
 
-## 许可证
+## License
 
-文档采用 MIT 许可证。
+The documentation is released under the MIT License.

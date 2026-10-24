@@ -1,89 +1,89 @@
-# skynet_mq.c 源码分析
+# Source Code Analysis of skynet_mq.c
 
-`skynet_mq.c` 实现了 Skynet 的消息队列系统，是整个框架的核心组件。在多个项目实践中，我们发现消息队列的设计直接影响系统的性能和稳定性。
+`skynet_mq.c` implements Skynet's message queue system and is a core component of the whole framework. From experience across multiple projects, we have found that the design of the message queue directly affects system performance and stability.
 
-## 文件概览
+## File Overview
 
-**职责**：消息队列管理、全局队列调度
+**Responsibilities**: message queue management, global queue scheduling
 
-**核心数据结构**：
-- `message_queue` - 服务消息队列
-- `global_queue` - 全局消息队列
+**Core data structures**:
+- `message_queue` - the service message queue
+- `global_queue` - the global message queue
 
-**关键函数**：
-- `skynet_mq_create()` - 创建消息队列
-- `skynet_mq_push()` - 消息入队
-- `skynet_mq_pop()` - 消息出队
-- `skynet_globalmq_push()` - 队列加入全局队列
-- `skynet_globalmq_pop()` - 从全局队列取队列
+**Key functions**:
+- `skynet_mq_create()` - create a message queue
+- `skynet_mq_push()` - enqueue a message
+- `skynet_mq_pop()` - dequeue a message
+- `skynet_globalmq_push()` - add a queue to the global queue
+- `skynet_globalmq_pop()` - take a queue from the global queue
 
-## 核心数据结构
+## Core Data Structures
 
-### message_queue - 服务消息队列
+### message_queue - Service Message Queue
 
 ```c
 struct message_queue {
-    struct spinlock lock;     // 自旋锁
-    uint32_t handle;         // 所属服务句柄
-    int cap;                 // 队列容量
-    int head;                // 队列头
-    int tail;                // 队列尾
-    int release;             // 释放标志
-    int in_global;           // 是否在全局队列中
-    int overload;            // 过载计数
-    int overload_threshold;  // 过载阈值
-    struct skynet_message *queue; // 消息数组
-    struct message_queue *next;   // 链表指针
+    struct spinlock lock;     // spinlock
+    uint32_t handle;         // the handle of the owning service
+    int cap;                 // queue capacity
+    int head;                // queue head
+    int tail;                // queue tail
+    int release;             // release flag
+    int in_global;           // whether it is in the global queue
+    int overload;            // overload count
+    int overload_threshold;  // overload threshold
+    struct skynet_message *queue; // message array
+    struct message_queue *next;   // linked-list pointer
 };
 ```
 
-**设计要点**：
+**Design points**:
 
-1. **环形缓冲区**：使用 head 和 tail 实现环形缓冲区
-2. **自旋锁保护**：使用自旋锁保证线程安全
-3. **动态扩展**：队列满时自动扩展
-4. **过载检测**：检测队列过载情况
+1. **Ring buffer**: a ring buffer is implemented with head and tail
+2. **Spinlock protection**: a spinlock guarantees thread safety
+3. **Dynamic expansion**: the queue expands automatically when full
+4. **Overload detection**: detects queue overload
 
-### global_queue - 全局消息队列
+### global_queue - Global Message Queue
 
 ```c
 struct global_queue {
-    struct message_queue *head; // 队列链表头
-    struct message_queue *tail; // 队列链表尾
-    struct spinlock lock;       // 自旋锁
+    struct message_queue *head; // head of the queue linked list
+    struct message_queue *tail; // tail of the queue linked list
+    struct spinlock lock;       // spinlock
 };
 ```
 
-**设计要点**：
+**Design points**:
 
-1. **链表结构**：使用单向链表管理所有服务队列
-2. **FIFO 调度**：先入先出，公平调度
-3. **自旋锁保护**：保证线程安全
+1. **Linked-list structure**: all service queues are managed with a singly linked list
+2. **FIFO scheduling**: first in, first out, fair scheduling
+3. **Spinlock protection**: guarantees thread safety
 
-## 消息队列生命周期
+## Message Queue Lifecycle
 
-### 1. 创建队列 - skynet_mq_create()
+### 1. Creating a Queue - skynet_mq_create()
 
 ```c
 struct message_queue * 
 skynet_mq_create(uint32_t handle) {
-    // 分配队列结构
+    // Allocate the queue structure
     struct message_queue *q = skynet_malloc(sizeof(*q));
     
-    // 初始化属性
+    // Initialize properties
     q->handle = handle;
-    q->cap = DEFAULT_QUEUE_SIZE;  // 默认容量 64
+    q->cap = DEFAULT_QUEUE_SIZE;  // default capacity 64
     q->head = 0;
     q->tail = 0;
     SPIN_INIT(q)
     
-    // 设置标志
-    q->in_global = MQ_IN_GLOBAL;  // 避免重复加入全局队列
+    // Set flags
+    q->in_global = MQ_IN_GLOBAL;  // avoid adding it to the global queue twice
     q->release = 0;
     q->overload = 0;
-    q->overload_threshold = MQ_OVERLOAD;  // 过载阈值 1024
+    q->overload_threshold = MQ_OVERLOAD;  // overload threshold 1024
     
-    // 分配消息数组
+    // Allocate the message array
     q->queue = skynet_malloc(sizeof(struct skynet_message) * q->cap);
     q->next = NULL;
     
@@ -91,23 +91,23 @@ skynet_mq_create(uint32_t handle) {
 }
 ```
 
-**初始化状态**：
+**Initial state**:
 
 ```mermaid
 graph TB
-    subgraph 消息队列初始状态
-        A[handle: 服务句柄]
-        B[cap: 64 默认容量]
+    subgraph Initial state of the message queue
+        A[handle: service handle]
+        B[cap: 64 default capacity]
         C[head: 0]
         D[tail: 0]
-        E[in_global: 1 已在全局队列中]
+        E[in_global: 1 already in the global queue]
         F[release: 0]
         G[overload: 0]
         H[overload_threshold: 1024]
     end
 ```
 
-### 2. 释放队列 - skynet_mq_release()
+### 2. Releasing a Queue - skynet_mq_release()
 
 ```c
 void 
@@ -115,11 +115,11 @@ skynet_mq_release(struct message_queue *q, message_drop drop_func, void *ud) {
     SPIN_LOCK(q)
     
     if (q->release) {
-        // 已标记为释放，执行释放
+        // Marked for release, perform the release
         SPIN_UNLOCK(q)
         _drop_queue(q, drop_func, ud);
     } else {
-        // 未标记为释放，重新加入全局队列
+        // Not marked for release, put it back in the global queue
         skynet_globalmq_push(q);
         SPIN_UNLOCK(q)
     }
@@ -129,12 +129,12 @@ static void
 _drop_queue(struct message_queue *q, message_drop drop_func, void *ud) {
     struct skynet_message msg;
     
-    // 丢弃所有消息
+    // Drop all messages
     while(!skynet_mq_pop(q, &msg)) {
         drop_func(&msg, ud);
     }
     
-    // 释放队列
+    // Release the queue
     _release(q);
 }
 
@@ -147,7 +147,7 @@ _release(struct message_queue *q) {
 }
 ```
 
-### 3. 标记释放 - skynet_mq_mark_release()
+### 3. Marking for Release - skynet_mq_mark_release()
 
 ```c
 void 
@@ -156,7 +156,7 @@ skynet_mq_mark_release(struct message_queue *q) {
     assert(q->release == 0);
     q->release = 1;
     
-    // 如果不在全局队列中，加入全局队列
+    // If it is not in the global queue, add it to the global queue
     if (q->in_global != MQ_IN_GLOBAL) {
         skynet_globalmq_push(q);
     }
@@ -165,9 +165,9 @@ skynet_mq_mark_release(struct message_queue *q) {
 }
 ```
 
-## 消息操作
+## Message Operations
 
-### 1. 消息入队 - skynet_mq_push()
+### 1. Enqueueing a Message - skynet_mq_push()
 
 ```c
 void 
@@ -175,18 +175,18 @@ skynet_mq_push(struct message_queue *q, struct skynet_message *message) {
     assert(message);
     SPIN_LOCK(q)
     
-    // 1. 将消息放入队列尾部
+    // 1. Put the message at the tail of the queue
     q->queue[q->tail] = *message;
     if (++ q->tail >= q->cap) {
-        q->tail = 0;  // 环形缓冲区
+        q->tail = 0;  // ring buffer
     }
     
-    // 2. 检查是否需要扩展
+    // 2. Check whether expansion is needed
     if (q->head == q->tail) {
         expand_queue(q);
     }
     
-    // 3. 如果不在全局队列中，加入全局队列
+    // 3. If it is not in the global queue, add it to the global queue
     if (q->in_global == 0) {
         q->in_global = MQ_IN_GLOBAL;
         skynet_globalmq_push(q);
@@ -196,25 +196,25 @@ skynet_mq_push(struct message_queue *q, struct skynet_message *message) {
 }
 ```
 
-**入队流程**：
+**Enqueue flow**:
 
 ```mermaid
 graph TB
-    Start[skynet_mq_push<br/>q, message] --> A[加锁<br/>SPIN_LOCK]
-    A --> B[放入消息<br/>q->queue tail = message]
-    B --> C[更新尾指针<br/>++q->tail 模 cap]
+    Start[skynet_mq_push<br/>q, message] --> A[Lock<br/>SPIN_LOCK]
+    A --> B[Place the message<br/>q->queue tail = message]
+    B --> C[Update the tail pointer<br/>++q->tail mod cap]
     C --> D{head == tail?}
     
-    D -->|是| E[扩展队列<br/>expand_queue]
-    D -->|否| F{in_global == 0?}
+    D -->|yes| E[Expand the queue<br/>expand_queue]
+    D -->|no| F{in_global == 0?}
     E --> F
     
-    F -->|是| G[加入全局队列<br/>skynet_globalmq_push]
-    F -->|否| H[解锁<br/>SPIN_UNLOCK]
+    F -->|yes| G[Add to the global queue<br/>skynet_globalmq_push]
+    F -->|no| H[Unlock<br/>SPIN_UNLOCK]
     G --> H
 ```
 
-### 2. 消息出队 - skynet_mq_pop()
+### 2. Dequeueing a Message - skynet_mq_pop()
 
 ```c
 int
@@ -223,7 +223,7 @@ skynet_mq_pop(struct message_queue *q, struct skynet_message *message) {
     SPIN_LOCK(q)
     
     if (q->head != q->tail) {
-        // 1. 取出消息
+        // 1. Take the message out
         *message = q->queue[q->head++];
         ret = 0;
         
@@ -231,28 +231,28 @@ skynet_mq_pop(struct message_queue *q, struct skynet_message *message) {
         int tail = q->tail;
         int cap = q->cap;
         
-        // 2. 处理环形缓冲区
+        // 2. Handle the ring buffer
         if (head >= cap) {
             q->head = head = 0;
         }
         
-        // 3. 计算队列长度
+        // 3. Compute the queue length
         int length = tail - head;
         if (length < 0) {
             length += cap;
         }
         
-        // 4. 检测过载
+        // 4. Detect overload
         while (length > q->overload_threshold) {
             q->overload = length;
             q->overload_threshold *= 2;
         }
     } else {
-        // 5. 队列为空，重置过载阈值
+        // 5. Queue is empty, reset the overload threshold
         q->overload_threshold = MQ_OVERLOAD;
     }
     
-    // 6. 如果队列为空，标记不在全局队列
+    // 6. If the queue is empty, mark it as not being in the global queue
     if (ret) {
         q->in_global = 0;
     }
@@ -263,63 +263,63 @@ skynet_mq_pop(struct message_queue *q, struct skynet_message *message) {
 }
 ```
 
-**出队流程**：
+**Dequeue flow**:
 
 ```mermaid
 graph TD
-    A[skynet_mq_pop<br/>q, message] --> B[加锁<br/>SPIN_LOCK]
-    B --> C{队列非空?}
-    C -->|是| D[取出消息]
-    C -->|否| E[返回 1]
-    D --> F[更新头指针]
-    F --> G[检测过载]
-    G --> H[解锁]
-    H --> I[返回 0]
-    E --> J[标记 in_global=0]
+    A[skynet_mq_pop<br/>q, message] --> B[Lock<br/>SPIN_LOCK]
+    B --> C{Queue non-empty?}
+    C -->|yes| D[Take the message out]
+    C -->|no| E[Return 1]
+    D --> F[Update the head pointer]
+    F --> G[Detect overload]
+    G --> H[Unlock]
+    H --> I[Return 0]
+    E --> J[Mark in_global=0]
     J --> H
 ```
 
-### 3. 队列扩展 - expand_queue()
+### 3. Queue Expansion - expand_queue()
 
 ```c
 static void
 expand_queue(struct message_queue *q) {
-    // 1. 分配新的更大数组
+    // 1. Allocate a new, larger array
     struct skynet_message *new_queue = skynet_malloc(sizeof(struct skynet_message) * q->cap * 2);
     
-    // 2. 复制消息到新数组
+    // 2. Copy the messages into the new array
     int i;
     for (i=0; i<q->cap; i++) {
         new_queue[i] = q->queue[(q->head + i) % q->cap];
     }
     
-    // 3. 更新指针和容量
+    // 3. Update the pointers and the capacity
     q->head = 0;
     q->tail = q->cap;
     q->cap *= 2;
     
-    // 4. 释放旧数组
+    // 4. Free the old array
     skynet_free(q->queue);
     q->queue = new_queue;
 }
 ```
 
-**扩展过程**：
+**Expansion process**:
 
 ```mermaid
 graph LR
-    subgraph 扩展前
+    subgraph Before expansion
         A1[cap: 64]
         A2[head: 60]
-        A3[tail: 60 满]
-        A4[消息: 60-59]
+        A3[tail: 60 full]
+        A4[messages: 60-59]
     end
 
-    subgraph 扩展后
+    subgraph After expansion
         B1[cap: 128]
         B2[head: 0]
         B3[tail: 64]
-        B4[消息: 0-63]
+        B4[messages: 0-63]
     end
 
     A1 --> B1
@@ -328,9 +328,9 @@ graph LR
     A4 --> B4
 ```
 
-## 全局队列操作
+## Global Queue Operations
 
-### 1. 加入全局队列 - skynet_globalmq_push()
+### 1. Adding to the Global Queue - skynet_globalmq_push()
 
 ```c
 void 
@@ -341,11 +341,11 @@ skynet_globalmq_push(struct message_queue * queue) {
     assert(queue->next == NULL);
     
     if(q->tail) {
-        // 链表非空，添加到尾部
+        // The linked list is non-empty, append to the tail
         q->tail->next = queue;
         q->tail = queue;
     } else {
-        // 链表为空，设置为头和尾
+        // The linked list is empty, set it as both head and tail
         q->head = q->tail = queue;
     }
     
@@ -353,7 +353,7 @@ skynet_globalmq_push(struct message_queue * queue) {
 }
 ```
 
-### 2. 从全局队列取出 - skynet_globalmq_pop()
+### 2. Taking from the Global Queue - skynet_globalmq_pop()
 
 ```c
 struct message_queue * 
@@ -364,11 +364,11 @@ skynet_globalmq_pop() {
     struct message_queue *mq = q->head;
     
     if(mq) {
-        // 取出头部
+        // Take the head out
         q->head = mq->next;
         
         if(q->head == NULL) {
-            // 链表变空
+            // The linked list becomes empty
             assert(mq == q->tail);
             q->tail = NULL;
         }
@@ -382,34 +382,34 @@ skynet_globalmq_pop() {
 }
 ```
 
-**全局队列结构**：
+**Global queue structure**:
 
 ```mermaid
 graph LR
-    subgraph 全局队列
-        Q1[队列 1] --> Q2[队列 2]
-        Q2 --> Q3[队列 3]
+    subgraph Global queue
+        Q1[Queue 1] --> Q2[Queue 2]
+        Q2 --> Q3[Queue 3]
     end
 
     Head[head] --> Q1
     Q3 --> Tail[tail]
 ```
 
-## 过载检测
+## Overload Detection
 
-### 过载阈值
+### Overload Threshold
 
 ```c
 #define MQ_OVERLOAD 1024
 
-// 检测过载
+// Detect overload
 while (length > q->overload_threshold) {
     q->overload = length;
     q->overload_threshold *= 2;
 }
 ```
 
-### 获取过载信息
+### Getting Overload Information
 
 ```c
 int
@@ -423,24 +423,24 @@ skynet_mq_overload(struct message_queue *q) {
 }
 ```
 
-**过载阈值变化**：
+**Overload threshold changes**:
 
 ```mermaid
 graph TD
-    A[初始阈值: 1024] --> B{队列长度 > 1024?}
-    B -->|是| C[overload = 当前长度]
+    A[Initial threshold: 1024] --> B{Queue length > 1024?}
+    B -->|yes| C[overload = current length]
     C --> D[threshold = 2048]
-    D --> E{队列长度 > 2048?}
-    E -->|是| F[overload = 当前长度]
+    D --> E{Queue length > 2048?}
+    E -->|yes| F[overload = current length]
     F --> G[threshold = 4096]
     G --> H[...]
-    B -->|否| I[正常]
-    E -->|否| I
+    B -->|no| I[Normal]
+    E -->|no| I
 ```
 
-## 队列信息查询
+## Queue Information Queries
 
-### 1. 获取句柄 - skynet_mq_handle()
+### 1. Getting the Handle - skynet_mq_handle()
 
 ```c
 uint32_t 
@@ -449,7 +449,7 @@ skynet_mq_handle(struct message_queue *q) {
 }
 ```
 
-### 2. 获取长度 - skynet_mq_length()
+### 2. Getting the Length - skynet_mq_length()
 
 ```c
 int
@@ -469,7 +469,7 @@ skynet_mq_length(struct message_queue *q) {
 }
 ```
 
-## 初始化
+## Initialization
 
 ```c
 void 
@@ -481,167 +481,167 @@ skynet_mq_init() {
 }
 ```
 
-## 线程安全
+## Thread Safety
 
-### 自旋锁使用
+### Using the Spinlock
 
 ```c
-// 加锁
+// Lock
 SPIN_LOCK(q)
-// ... 临界区操作 ...
+// ... critical section ...
 SPIN_UNLOCK(q)
 
-// 或者
+// Or
 spinlock_lock(&q->lock);
-// ... 临界区操作 ...
+// ... critical section ...
 spinlock_unlock(&q->lock);
 ```
 
-### 原子操作
+### Atomic Operations
 
 ```c
-// in_global 标志的读写
+// Reading and writing the in_global flag
 if (q->in_global == 0) {
     q->in_global = MQ_IN_GLOBAL;
     // ...
 }
 ```
 
-## 设计模式
+## Design Patterns
 
-### 1. 环形缓冲区
+### 1. Ring Buffer
 
 ```c
-// 入队
+// Enqueue
 q->queue[q->tail] = message;
 if (++q->tail >= q->cap) {
     q->tail = 0;
 }
 
-// 出队
+// Dequeue
 message = q->queue[q->head];
 if (++q->head >= q->cap) {
     q->head = 0;
 }
 ```
 
-### 2. 链表队列
+### 2. Linked-List Queue
 
 ```c
-// 全局队列使用链表
+// The global queue uses a linked list
 struct message_queue *next;
 
-// 入队
+// Enqueue
 q->tail->next = queue;
 q->tail = queue;
 
-// 出队
+// Dequeue
 mq = q->head;
 q->head = mq->next;
 ```
 
-### 3. 生产者-消费者
+### 3. Producer-Consumer
 
 ```mermaid
 graph TD
-    subgraph 生产者-服务发送消息
-        A[skynet_mq_push<br/>q, message] --> B[消息入队]
-        B --> C[加入全局队列]
+    subgraph Producer - services send messages
+        A[skynet_mq_push<br/>q, message] --> B[Message enqueued]
+        B --> C[Added to the global queue]
     end
 
-    subgraph 消费者-工作线程处理消息
-        D[skynet_globalmq_pop] --> E[获取服务队列]
+    subgraph Consumer - worker threads handle messages
+        D[skynet_globalmq_pop] --> E[Get a service queue]
         E --> F[skynet_mq_pop<br/>q, message]
-        F --> G[消息出队]
-        G --> H[处理消息]
+        F --> G[Message dequeued]
+        G --> H[Handle the message]
     end
 
     C --> D
 ```
 
-## 性能优化
+## Performance Optimization
 
-### 1. 批量处理
+### 1. Batch Processing
 
 ```c
-// 工作线程一次处理多个消息
+// A worker thread handles multiple messages at once
 for (int i = 0; i < batch_size; i++) {
     struct skynet_message *msg = skynet_mq_pop(q, &msg);
     if (msg) {
-        // 处理消息
+        // Handle the message
     }
 }
 ```
 
-### 2. 权重调度
+### 2. Weighted Scheduling
 
 ```c
-// 根据队列长度决定处理数量
+// Decide the number of messages to handle based on the queue length
 int weight = skynet_mq_length(q) / global_mq_count;
 if (weight == 0) weight = 1;
 ```
 
-## 与其他模块的交互
+## Interaction with Other Modules
 
-### 与 skynet_server.c 的交互
+### Interaction with skynet_server.c
 
 ```c
-// 创建服务时创建队列
+// Create the queue when creating a service
 ctx->queue = skynet_mq_create(handle);
 
-// 发送消息时入队
+// Enqueue when sending a message
 skynet_mq_push(ctx->queue, message);
 
-// 处理消息时出队
+// Dequeue when handling a message
 struct skynet_message *msg = skynet_mq_pop(q, &msg);
 ```
 
-### 与 skynet_start.c 的交互
+### Interaction with skynet_start.c
 
 ```c
-// 初始化全局队列
+// Initialize the global queue
 skynet_mq_init();
 
-// 工作线程从全局队列取队列
+// Worker threads take queues from the global queue
 struct message_queue *q = skynet_globalmq_pop();
 ```
 
-## 关键设计决策
+## Key Design Decisions
 
-### 1. 为什么使用环形缓冲区？
+### 1. Why use a ring buffer?
 
-- **内存效率**：避免频繁的内存分配和释放
-- **性能**：入队出队操作 O(1)
-- **简单**：实现简单，易于理解
+- **Memory efficiency**: avoids frequent memory allocation and deallocation
+- **Performance**: enqueue and dequeue operations are O(1)
+- **Simplicity**: simple to implement and easy to understand
 
-### 2. 为什么使用自旋锁？
+### 2. Why use a spinlock?
 
-- **低延迟**：自旋锁在临界区很短时性能更好
-- **避免上下文切换**：减少线程切换开销
-- **简单**：实现简单，易于理解
+- **Low latency**: a spinlock performs better when the critical section is very short
+- **Avoids context switches**: reduces the overhead of thread switching
+- **Simplicity**: simple to implement and easy to understand
 
-### 3. 为什么使用全局队列？
+### 3. Why use a global queue?
 
-- **公平调度**：所有服务公平地获得处理机会
-- **负载均衡**：工作线程从全局队列取队列，自然负载均衡
-- **简单**：避免复杂的优先级调度
+- **Fair scheduling**: all services get processing opportunities fairly
+- **Load balancing**: worker threads take queues from the global queue, which balances the load naturally
+- **Simplicity**: avoids complex priority scheduling
 
-## 常见问题
+## Frequently Asked Questions
 
-### 1. 队列满时怎么办？
+### 1. What happens when the queue is full?
 
-队列会自动扩展，扩展到原来的 2 倍。
+The queue expands automatically, growing to twice its original size.
 
-### 2. 如何检测过载？
+### 2. How is overload detected?
 
-通过 `overload_threshold` 检测，阈值会动态调整。
+It is detected through `overload_threshold`, which is adjusted dynamically.
 
-### 3. 如何保证线程安全？
+### 3. How is thread safety guaranteed?
 
-使用自旋锁保护所有队列操作。
+A spinlock protects all queue operations.
 
-## 下一步
+## Next Steps
 
-- [skynet_handle.c 分析](/analysis/skynet-handle) - 句柄管理的实现
-- [skynet_timer.c 分析](/analysis/skynet-timer) - 定时器的实现
-- [消息驱动设计](/architecture/message-driven) - 消息系统的设计
+- [Analysis of skynet_handle.c](/analysis/skynet-handle) - implementation of handle management
+- [Analysis of skynet_timer.c](/analysis/skynet-timer) - implementation of the timer
+- [Message-Driven Design](/architecture/message-driven) - design of the message system
