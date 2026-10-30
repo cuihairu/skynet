@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="1260" viewBox="0 0 1280 1260" role="img" aria-labelledby="title desc" xml:lang="zh-CN">
+<title id="title">Skynet · 分层架构</title>
+<desc id="desc">消息驱动 + Actor 模型。从上到下：Lua 服务层（业务），框架层（skynet.lua + 协程 + C 绑定），C 核心层（skynet-src），线程模型。客户端经 socket_server 进入，集群经 skynet_harbor 跨节点。每个 Lua 服务独立 VM 与消息队列。实线为业务数据流，虚线为控制与承载。</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10Z" fill="context-stroke"/></marker></defs>
+<style>text{font-family:Arial,'Noto Sans CJK SC','Microsoft YaHei',sans-serif;fill:#172b4d}.title{font-size:30px;font-weight:700}.name{font-size:23px;font-weight:700}.body{font-size:17px;fill:#435570}.small{font-size:15px;fill:#52647b}.label{font-size:15px;fill:#435570;paint-order:stroke;stroke:#f8fafc;stroke-width:5px;stroke-linejoin:round}.edge{fill:none;stroke-linejoin:round}.control{stroke-dasharray:7 5}</style>
+<rect width="1280" height="1260" rx="20" fill="#f8fafc"/>
+<text x="40" y="48" class="title" text-anchor="start">Skynet · 分层架构</text>
+<text x="40" y="80" class="body" text-anchor="start">消息驱动 + Actor 模型 · Lua 业务 / C 核心 · 每服务独立 Lua VM 与消息队列 · 多线程承载</text>
+<path d="M65 205 V789 H120" fill="none" stroke="#f8fafc" stroke-width="9"/>
+<path id="client-socket" data-from="network-client" data-to="socket-server" d="M65 205 V789 H120" class="edge" style="stroke:#475569;stroke-width:2" marker-end="url(#arrow)"/>
+<path d="M1200 205 V872 H895" fill="none" stroke="#f8fafc" stroke-width="9"/>
+<path id="cluster-harbor" data-from="cluster-node" data-to="harbor" d="M1200 205 V872 H895" class="edge control" style="stroke:#64748b;stroke-width:2" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+<path d="M560 430 V490" fill="none" stroke="#f8fafc" stroke-width="9"/>
+<path id="msg-passing" data-from="lua-layer" data-to="framework" d="M560 430 V490" class="edge" style="stroke:#2563eb;stroke-width:3" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+<path d="M560 640 V700" fill="none" stroke="#f8fafc" stroke-width="9"/>
+<path id="core-api" data-from="framework" data-to="core" d="M560 640 V700" class="edge" style="stroke:#2563eb;stroke-width:3" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+<path d="M560 920 V980" fill="none" stroke="#f8fafc" stroke-width="9"/>
+<path id="run-on" data-from="core" data-to="threads" d="M560 920 V980" class="edge control" style="stroke:#64748b;stroke-width:2" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+<g id="network-client" data-node="network-client"><rect x="40" y="115" width="300" height="90" rx="14" fill="#fff7ed" stroke="#fdba74" stroke-width="1.5"/>
+<text x="60" y="152" class="name" text-anchor="start">网络客户端</text>
+<text x="60" y="185" class="body" text-anchor="start">游戏客户端 · TCP/UDP 长连接</text>
+</g>
+<g id="cluster-node" data-node="cluster-node"><rect x="940" y="115" width="300" height="90" rx="14" fill="#fff7ed" stroke="#fdba74" stroke-width="1.5" stroke-dasharray="6 5"/>
+<text x="960" y="152" class="name" text-anchor="start">其他 skynet 节点</text>
+<text x="960" y="185" class="body" text-anchor="start">集群 · harbor 跨节点调用</text>
+</g>
+<g id="lua-layer" data-node="lua-layer"><rect x="90" y="260" width="1060" height="170" rx="14" fill="#fff7ed" stroke="#fdba74" stroke-width="1.5"/>
+<text x="115" y="292" class="body" text-anchor="start">Lua 服务层 · 业务层（service/ + 用户服务）</text>
+<rect x="120" y="312" width="480" height="96" rx="12" fill="#fff" stroke="#fdba74" stroke-width="1.5"/>
+<text x="140" y="345" class="name" text-anchor="start">内置服务 · service/</text>
+<text x="140" y="375" class="body" text-anchor="start">gate · launcher · console · clusterd</text>
+<text x="140" y="398" class="body" text-anchor="start">datacenterd · multicastd · sharedatad</text>
+<rect x="630" y="312" width="490" height="96" rx="12" fill="#fff" stroke="#fdba74" stroke-width="1.5"/>
+<text x="650" y="345" class="name" text-anchor="start">用户服务 ×N · 游戏逻辑</text>
+<text x="650" y="375" class="body" text-anchor="start">每服务独立 Lua VM + 消息队列</text>
+<text x="650" y="398" class="body" text-anchor="start">状态隔离 · 无共享锁 · 热更新</text>
+</g>
+<g id="framework" data-node="framework"><rect x="90" y="490" width="1060" height="150" rx="14" fill="#fff" stroke="#cbd5e1" stroke-width="1.5"/>
+<text x="115" y="522" class="body" text-anchor="start">框架层 · Lua API + C 绑定（lualib/ + lualib-src/）</text>
+<rect x="120" y="540" width="320" height="80" rx="12" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+<text x="140" y="573" class="name" text-anchor="start">skynet.lua · 核心 API</text>
+<text x="140" y="603" class="body" text-anchor="start">send / call / response / error</text>
+<rect x="460" y="540" width="300" height="80" rx="12" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+<text x="480" y="573" class="name" text-anchor="start">协程支持 · skynet.coroutine</text>
+<text x="480" y="603" class="body" text-anchor="start">同步写 · 异步跑 · 挂起 / 恢复</text>
+<rect x="780" y="540" width="340" height="80" rx="12" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+<text x="800" y="573" class="name" text-anchor="start">C 绑定 · lualib-src/</text>
+<text x="800" y="603" class="body" text-anchor="start">socket · netpack · sproto · cluster · seri · stm</text>
+</g>
+<g id="core" data-node="core"><rect x="90" y="700" width="1060" height="220" rx="14" fill="#eef2ff" stroke="#a5b4fc" stroke-width="1.5"/>
+<text x="115" y="732" class="body" text-anchor="start">C 核心层 · 消息驱动核心（skynet-src/）</text>
+<rect x="120" y="752" width="245" height="75" rx="12" fill="#fff" stroke="#a5b4fc" stroke-width="1.5"/>
+<text x="140" y="785" class="name" text-anchor="start">socket_server.c</text>
+<text x="140" y="812" class="body" text-anchor="start">epoll/kqueue 网络 I/O</text>
+<rect x="385" y="752" width="245" height="75" rx="12" fill="#fff" stroke="#a5b4fc" stroke-width="1.5"/>
+<text x="405" y="785" class="name" text-anchor="start">skynet_server.c</text>
+<text x="405" y="812" class="body" text-anchor="start">服务管理 · 调度</text>
+<rect x="650" y="752" width="245" height="75" rx="12" fill="#fff" stroke="#a5b4fc" stroke-width="1.5"/>
+<text x="670" y="785" class="name" text-anchor="start">skynet_mq.c</text>
+<text x="670" y="812" class="body" text-anchor="start">全局 + 服务消息队列</text>
+<rect x="915" y="752" width="205" height="75" rx="12" fill="#fff" stroke="#a5b4fc" stroke-width="1.5"/>
+<text x="935" y="785" class="name" text-anchor="start">skynet_timer.c</text>
+<text x="935" y="812" class="body" text-anchor="start">时间轮 · 毫秒定时</text>
+<rect x="120" y="845" width="245" height="55" rx="12" fill="#fff" stroke="#a5b4fc" stroke-width="1.5"/>
+<text x="242" y="878" class="body" text-anchor="middle">skynet_handle.c · handle 表</text>
+<rect x="385" y="845" width="245" height="55" rx="12" fill="#fff" stroke="#a5b4fc" stroke-width="1.5"/>
+<text x="507" y="878" class="body" text-anchor="middle">skynet_module.c · so 加载</text>
+<rect id="harbor" x="650" y="845" width="245" height="55" rx="12" fill="#fff" stroke="#a5b4fc" stroke-width="1.5"/>
+<text x="772" y="878" class="body" text-anchor="middle">skynet_harbor.c · 集群</text>
+<rect x="915" y="845" width="205" height="55" rx="12" fill="#fff" stroke="#a5b4fc" stroke-width="1.5"/>
+<text x="1017" y="878" class="body" text-anchor="middle">skynet_monitor.c · 死循环</text>
+</g>
+<g id="threads" data-node="threads"><rect x="90" y="980" width="1060" height="140" rx="14" fill="#eef8f5" stroke="#86c9b3" stroke-width="1.5"/>
+<text x="115" y="1012" class="body" text-anchor="start">线程模型 · 运行载体（skynet_start.c）</text>
+<rect x="120" y="1032" width="245" height="68" rx="12" fill="#fff" stroke="#86c9b3" stroke-width="1.5"/>
+<text x="140" y="1065" class="name" text-anchor="start">N 工作线程</text>
+<text x="140" y="1090" class="body" text-anchor="start">全局队列取服务队列 · 权重</text>
+<rect x="385" y="1032" width="245" height="68" rx="12" fill="#fff" stroke="#86c9b3" stroke-width="1.5"/>
+<text x="405" y="1065" class="name" text-anchor="start">Timer 线程</text>
+<text x="405" y="1090" class="body" text-anchor="start">2.5ms 推进时间轮</text>
+<rect x="650" y="1032" width="245" height="68" rx="12" fill="#fff" stroke="#86c9b3" stroke-width="1.5"/>
+<text x="670" y="1065" class="name" text-anchor="start">Socket 线程</text>
+<text x="670" y="1090" class="body" text-anchor="start">epoll 批量 · 不阻塞业务</text>
+<rect x="915" y="1032" width="205" height="68" rx="12" fill="#fff" stroke="#86c9b3" stroke-width="1.5"/>
+<text x="935" y="1065" class="name" text-anchor="start">Monitor 线程</text>
+<text x="935" y="1090" class="body" text-anchor="start">5s 死循环检测</text>
+</g>
+<text transform="translate(50 600) rotate(-90)" class="label" text-anchor="start">TCP/UDP 客户端连接 ↓</text>
+<text transform="translate(1226 600) rotate(-90)" class="label" text-anchor="start">集群跨节点 ⇅</text>
+<text x="580" y="462" class="label" text-anchor="start" style="fill:#2563eb">消息 send/call → · 响应 ←</text>
+<text x="580" y="672" class="label" text-anchor="start" style="fill:#2563eb">C API → · 结果 ←</text>
+<text x="580" y="952" class="label" text-anchor="start">运行于 · 线程承载</text>
+<text x="90" y="1210" class="label" text-anchor="start">实线：业务数据流 / 消息 · 虚线：控制 / 承载 · 每个 Lua 服务独立 VM 与消息队列，无共享内存锁</text>
+<text x="90" y="1238" class="small" text-anchor="start">第三方依赖：Lua 5.5 多状态 VM · jemalloc 内存分配器（见 3rd/）· 模块以 .so 动态加载</text>
+</svg>

@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="1260" viewBox="0 0 1280 1260" role="img" aria-labelledby="title desc" xml:lang="en">
+<title id="title">Skynet · Layered Architecture</title>
+<desc id="desc">Message-driven actor model. Top to bottom: Lua service layer (business), framework layer (skynet.lua + coroutines + C bindings), C core layer (skynet-src), thread model. Clients enter via socket_server, clusters cross nodes via skynet_harbor. Each Lua service has its own VM and message queue. Solid lines are business data flow, dashed lines are control and hosting.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10Z" fill="context-stroke"/></marker></defs>
+<style>text{font-family:Arial,'Noto Sans CJK SC','Microsoft YaHei',sans-serif;fill:#172b4d}.title{font-size:30px;font-weight:700}.name{font-size:23px;font-weight:700}.body{font-size:17px;fill:#435570}.small{font-size:15px;fill:#52647b}.label{font-size:15px;fill:#435570;paint-order:stroke;stroke:#f8fafc;stroke-width:5px;stroke-linejoin:round}.edge{fill:none;stroke-linejoin:round}.control{stroke-dasharray:7 5}</style>
+<rect width="1280" height="1260" rx="20" fill="#f8fafc"/>
+<text x="40" y="48" class="title" text-anchor="start">Skynet · Layered Architecture</text>
+<text x="40" y="80" class="body" text-anchor="start">Message-driven actor model · Lua business / C core · per-service Lua VM and message queue · multi-thread hosting</text>
+<path d="M65 205 V789 H120" fill="none" stroke="#f8fafc" stroke-width="9"/>
+<path id="client-socket" data-from="network-client" data-to="socket-server" d="M65 205 V789 H120" class="edge" style="stroke:#475569;stroke-width:2" marker-end="url(#arrow)"/>
+<path d="M1200 205 V872 H895" fill="none" stroke="#f8fafc" stroke-width="9"/>
+<path id="cluster-harbor" data-from="cluster-node" data-to="harbor" d="M1200 205 V872 H895" class="edge control" style="stroke:#64748b;stroke-width:2" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+<path d="M560 430 V490" fill="none" stroke="#f8fafc" stroke-width="9"/>
+<path id="msg-passing" data-from="lua-layer" data-to="framework" d="M560 430 V490" class="edge" style="stroke:#2563eb;stroke-width:3" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+<path d="M560 640 V700" fill="none" stroke="#f8fafc" stroke-width="9"/>
+<path id="core-api" data-from="framework" data-to="core" d="M560 640 V700" class="edge" style="stroke:#2563eb;stroke-width:3" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+<path d="M560 920 V980" fill="none" stroke="#f8fafc" stroke-width="9"/>
+<path id="run-on" data-from="core" data-to="threads" d="M560 920 V980" class="edge control" style="stroke:#64748b;stroke-width:2" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+<g id="network-client" data-node="network-client"><rect x="40" y="115" width="300" height="90" rx="14" fill="#fff7ed" stroke="#fdba74" stroke-width="1.5"/>
+<text x="60" y="152" class="name" text-anchor="start">Network clients</text>
+<text x="60" y="185" class="body" text-anchor="start">Game clients · TCP/UDP long connections</text>
+</g>
+<g id="cluster-node" data-node="cluster-node"><rect x="940" y="115" width="300" height="90" rx="14" fill="#fff7ed" stroke="#fdba74" stroke-width="1.5" stroke-dasharray="6 5"/>
+<text x="960" y="152" class="name" text-anchor="start">Other skynet nodes</text>
+<text x="960" y="185" class="body" text-anchor="start">Cluster · cross-node harbor calls</text>
+</g>
+<g id="lua-layer" data-node="lua-layer"><rect x="90" y="260" width="1060" height="170" rx="14" fill="#fff7ed" stroke="#fdba74" stroke-width="1.5"/>
+<text x="115" y="292" class="body" text-anchor="start">Lua service layer · business (service/ + user services)</text>
+<rect x="120" y="312" width="480" height="96" rx="12" fill="#fff" stroke="#fdba74" stroke-width="1.5"/>
+<text x="140" y="345" class="name" text-anchor="start">Built-in services · service/</text>
+<text x="140" y="375" class="body" text-anchor="start">gate · launcher · console · clusterd</text>
+<text x="140" y="398" class="body" text-anchor="start">datacenterd · multicastd · sharedatad</text>
+<rect x="630" y="312" width="490" height="96" rx="12" fill="#fff" stroke="#fdba74" stroke-width="1.5"/>
+<text x="650" y="345" class="name" text-anchor="start">User services ×N · game logic</text>
+<text x="650" y="375" class="body" text-anchor="start">per-service Lua VM + message queue</text>
+<text x="650" y="398" class="body" text-anchor="start">state isolation · no shared lock · hot reload</text>
+</g>
+<g id="framework" data-node="framework"><rect x="90" y="490" width="1060" height="150" rx="14" fill="#fff" stroke="#cbd5e1" stroke-width="1.5"/>
+<text x="115" y="522" class="body" text-anchor="start">Framework layer · Lua API + C bindings (lualib/ + lualib-src/)</text>
+<rect x="120" y="540" width="320" height="80" rx="12" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+<text x="140" y="573" class="name" text-anchor="start">skynet.lua · core API</text>
+<text x="140" y="603" class="body" text-anchor="start">send / call / response / error</text>
+<rect x="460" y="540" width="300" height="80" rx="12" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+<text x="480" y="573" class="name" text-anchor="start">Coroutines · skynet.coroutine</text>
+<text x="480" y="603" class="body" text-anchor="start">synchronous write · async run · suspend/resume</text>
+<rect x="780" y="540" width="340" height="80" rx="12" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+<text x="800" y="573" class="name" text-anchor="start">C bindings · lualib-src/</text>
+<text x="800" y="603" class="body" text-anchor="start">socket · netpack · sproto · cluster · seri · stm</text>
+</g>
+<g id="core" data-node="core"><rect x="90" y="700" width="1060" height="220" rx="14" fill="#eef2ff" stroke="#a5b4fc" stroke-width="1.5"/>
+<text x="115" y="732" class="body" text-anchor="start">C core layer · message-driven core (skynet-src/)</text>
+<rect x="120" y="752" width="245" height="75" rx="12" fill="#fff" stroke="#a5b4fc" stroke-width="1.5"/>
+<text x="140" y="785" class="name" text-anchor="start">socket_server.c</text>
+<text x="140" y="812" class="body" text-anchor="start">epoll/kqueue network I/O</text>
+<rect x="385" y="752" width="245" height="75" rx="12" fill="#fff" stroke="#a5b4fc" stroke-width="1.5"/>
+<text x="405" y="785" class="name" text-anchor="start">skynet_server.c</text>
+<text x="405" y="812" class="body" text-anchor="start">service management · dispatch</text>
+<rect x="650" y="752" width="245" height="75" rx="12" fill="#fff" stroke="#a5b4fc" stroke-width="1.5"/>
+<text x="670" y="785" class="name" text-anchor="start">skynet_mq.c</text>
+<text x="670" y="812" class="body" text-anchor="start">global + per-service message queues</text>
+<rect x="915" y="752" width="205" height="75" rx="12" fill="#fff" stroke="#a5b4fc" stroke-width="1.5"/>
+<text x="935" y="785" class="name" text-anchor="start">skynet_timer.c</text>
+<text x="935" y="812" class="body" text-anchor="start">timing wheel · millisecond timers</text>
+<rect x="120" y="845" width="245" height="55" rx="12" fill="#fff" stroke="#a5b4fc" stroke-width="1.5"/>
+<text x="242" y="878" class="body" text-anchor="middle">skynet_handle.c · handle table</text>
+<rect x="385" y="845" width="245" height="55" rx="12" fill="#fff" stroke="#a5b4fc" stroke-width="1.5"/>
+<text x="507" y="878" class="body" text-anchor="middle">skynet_module.c · .so loading</text>
+<rect id="harbor" x="650" y="845" width="245" height="55" rx="12" fill="#fff" stroke="#a5b4fc" stroke-width="1.5"/>
+<text x="772" y="878" class="body" text-anchor="middle">skynet_harbor.c · cluster</text>
+<rect x="915" y="845" width="205" height="55" rx="12" fill="#fff" stroke="#a5b4fc" stroke-width="1.5"/>
+<text x="1017" y="878" class="body" text-anchor="middle">skynet_monitor.c · deadloop</text>
+</g>
+<g id="threads" data-node="threads"><rect x="90" y="980" width="1060" height="140" rx="14" fill="#eef8f5" stroke="#86c9b3" stroke-width="1.5"/>
+<text x="115" y="1012" class="body" text-anchor="start">Thread model · hosting engine (skynet_start.c)</text>
+<rect x="120" y="1032" width="245" height="68" rx="12" fill="#fff" stroke="#86c9b3" stroke-width="1.5"/>
+<text x="140" y="1065" class="name" text-anchor="start">N worker threads</text>
+<text x="140" y="1090" class="body" text-anchor="start">pull service queues · weighted</text>
+<rect x="385" y="1032" width="245" height="68" rx="12" fill="#fff" stroke="#86c9b3" stroke-width="1.5"/>
+<text x="405" y="1065" class="name" text-anchor="start">Timer thread</text>
+<text x="405" y="1090" class="body" text-anchor="start">2.5ms wheel advance</text>
+<rect x="650" y="1032" width="245" height="68" rx="12" fill="#fff" stroke="#86c9b3" stroke-width="1.5"/>
+<text x="670" y="1065" class="name" text-anchor="start">Socket thread</text>
+<text x="670" y="1090" class="body" text-anchor="start">epoll batch · non-blocking</text>
+<rect x="915" y="1032" width="205" height="68" rx="12" fill="#fff" stroke="#86c9b3" stroke-width="1.5"/>
+<text x="935" y="1065" class="name" text-anchor="start">Monitor thread</text>
+<text x="935" y="1090" class="body" text-anchor="start">5s deadloop detection</text>
+</g>
+<text transform="translate(50 600) rotate(-90)" class="label" text-anchor="start">TCP/UDP client connections ↓</text>
+<text transform="translate(1226 600) rotate(-90)" class="label" text-anchor="start">cluster cross-node ⇅</text>
+<text x="580" y="462" class="label" text-anchor="start" style="fill:#2563eb">message send/call → · response ←</text>
+<text x="580" y="672" class="label" text-anchor="start" style="fill:#2563eb">C API → · result ←</text>
+<text x="580" y="952" class="label" text-anchor="start">runs on · thread hosting</text>
+<text x="90" y="1210" class="label" text-anchor="start">solid: business data flow / messages · dashed: control / hosting · each Lua service has its own VM and queue, no shared-memory locks</text>
+<text x="90" y="1238" class="small" text-anchor="start">Third-party deps: Lua 5.5 multi-state VM · jemalloc allocator (see 3rd/) · modules loaded as .so at runtime</text>
+</svg>

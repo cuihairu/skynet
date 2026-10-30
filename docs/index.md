@@ -28,6 +28,12 @@ features:
     details: Multi-node clusters via the Harbor mechanism, supporting cross-node service calls.
 ---
 
+## Architecture
+
+The layers follow the code: Lua services on top, the framework API and C bindings in the middle, the message-driven C core below, and the thread model as the hosting engine:
+
+![Skynet layered architecture](/images/architecture-en.svg)
+
 <div class="arch-hero">
 
 **Core Philosophy**: Skynet is a lightweight game server framework whose core design philosophy is the **Actor model** + **message-driven** architecture. Based on real-world project experience, this design avoids the complexity of shared state, making the system easier to understand and maintain.
