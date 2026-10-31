@@ -51,7 +51,8 @@ function candidates(base) {
   }
   // VitePress publicDir assets, e.g. /logo.svg -> docs/public/logo.svg
   if (base.startsWith('/') && /\.[a-z0-9]+$/i.test(base)) {
-    list.push(path.join(DOCS, 'public', base.slice(1)));
+    const relToDocs = path.relative(DOCS, base);
+    list.push(path.join(DOCS, 'public', relToDocs));
   }
   return list;
 }
