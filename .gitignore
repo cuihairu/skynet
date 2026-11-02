@@ -7,6 +7,7 @@
 3rd/lua/all
 /cservice
 /luaclib
+/test/test_malloc_hook
 *.so
 *.dSYM
 .DS_Store

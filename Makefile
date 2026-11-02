@@ -123,6 +123,18 @@ clean :
   rm -rf $(SKYNET_BUILD_PATH)/*.dSYM $(CSERVICE_PATH)/*.dSYM $(LUA_CLIB_PATH)/*.dSYM
 	$(MAKE) clean -f mingw.mk
 
+# Standalone unit tests (C) that exercise malloc_hook internals.
+TEST_BIN = test/test_malloc_hook
+TEST_CFLAGS = -g -O2 -Wall -Iskynet-src -I$(LUA_INC) -I$(JEMALLOC_INC)
+
+.PHONY: test
+
+$(TEST_BIN) : test/test_malloc_hook.c skynet-src/mem_info.c $(LUA_STATICLIB) $(MALLOC_STATICLIB)
+	$(CC) $(TEST_CFLAGS) $^ $(LDFLAGS) $(SKYNET_LIBS) -o $@
+
+test : $(TEST_BIN)
+	$(TEST_BIN)
+
 cleanall: clean
 ifneq (,$(wildcard 3rd/jemalloc/Makefile))
 	cd 3rd/jemalloc && $(MAKE) clean && rm Makefile

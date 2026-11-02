@@ -35,14 +35,49 @@ struct mem_cookie {
 #define SLOT_SIZE 0x10000
 #define PREFIX_SIZE sizeof(struct mem_cookie)
 
+// The 24-bit handle index space (HANDLE_MASK) is much larger than SLOT_SIZE,
+// so two different handles can hash to the same slot.  A fixed direct-mapped
+// table would let a later handle overwrite an earlier handle's slot; a
+// subsequent free of the earlier handle would then decrement the wrong
+// counter and corrupt mem_stats (alloc - free underflows to a huge value).
+// Use an open-addressed hash table with compare-exchange slot reservation and
+// ownership checks so every handle keeps its own, balanced counters.
+#define HASH_MULT 2654435761u
+
 static struct mem_data mem_stats[SLOT_SIZE];
 _Static_assert(alignof(mem_stats) % CACHE_LINE_SIZE == 0, "mem_stats must be cache-line aligned");
 
+static inline uint32_t
+hash_handle(uint32_t handle) {
+	// Mix the high handle bits into the slot index so consecutive handles
+	// (which share low bits) spread across the table instead of clustering.
+	uint64_t v = (uint64_t)handle * HASH_MULT;
+	return (uint32_t)(v >> 16) & (SLOT_SIZE - 1);
+}
+
+// Locate the slot owned by handle, or (when reserve != 0) the first free slot
+// and reserve it for handle with a compare-exchange.  Returns NULL when the
+// table is full; the caller then drops the stat instead of corrupting it.
 static struct mem_data *
-get_mem_stat(uint32_t handle) {
-	int h = (int)(handle & (SLOT_SIZE - 1));
-	struct mem_data *data = &mem_stats[h];
-	return data;
+find_mem_stat(uint32_t handle, int reserve) {
+	uint32_t h = hash_handle(handle);
+	for (uint32_t i = 0; i < SLOT_SIZE; i++) {
+		struct mem_data *data = &mem_stats[(h + i) & (SLOT_SIZE - 1)];
+		uint32_t cur = (uint32_t)ATOM_LOAD(&data->handle);
+		if (cur == handle) {
+			return data;
+		}
+		if (reserve && cur == 0) {
+			if (ATOM_CAS_ULONG(&data->handle, 0, handle)) {
+				// We own the slot now; no other thread can reach this handle
+				// before the reservation is visible, so it is safe to zero
+				// the counters before any alloc/free is recorded.
+				atomic_meminfo_init(&data->info);
+				return data;
+			}
+		}
+	}
+	return NULL;
 }
 
 #ifndef NOUSE_JEMALLOC
@@ -55,17 +90,29 @@ get_mem_stat(uint32_t handle) {
 
 inline static void
 update_xmalloc_stat_alloc(uint32_t handle, size_t __n) {
-	struct mem_data *data = get_mem_stat(handle);
-    // 当两个不同的 handle 被哈希到同一个槽位时, 新的服务会覆盖旧服务的数据
-    // 这种情况在实际运行中非常罕见, 因为同时存在的服务数量很难超过 65536
-    ATOM_STORE(&data->handle, handle);
-	atomic_meminfo_alloc(&data->info, __n);
+	if (handle == 0)
+		return;
+	struct mem_data *data = find_mem_stat(handle, 1);
+	if (data) {
+		atomic_meminfo_alloc(&data->info, __n);
+	}
 }
 
 inline static void
 update_xmalloc_stat_free(uint32_t handle, size_t __n) {
-	struct mem_data *data = get_mem_stat(handle);
-	atomic_meminfo_free(&data->info, __n);
+	if (handle == 0)
+		return;
+	struct mem_data *data = find_mem_stat(handle, 0);
+	if (data) {
+		atomic_meminfo_free(&data->info, __n);
+		// Recycle the slot once this handle holds no live allocation so a
+		// long-running node does not exhaust the table with stale handles.
+		// A handle's alloc/free are serialised by its owning service thread,
+		// so no racing alloc can observe the half-reset slot.
+		if (ATOM_LOAD(&data->info.alloc_count) == ATOM_LOAD(&data->info.free_count)) {
+			ATOM_STORE(&data->handle, 0);
+		}
+	}
 }
 
 inline static void*
@@ -363,10 +410,11 @@ dump_mem_lua(lua_State *L) {
 size_t
 malloc_current_memory(void) {
 	uint32_t handle = skynet_current_handle();
-	struct mem_data *data = get_mem_stat(handle);
-	if (ATOM_LOAD(&data->handle) != handle) {
+	if (handle == 0)
 		return 0;
-	}
+	struct mem_data *data = find_mem_stat(handle, 0);
+	if (data == NULL)
+		return 0;
 	MemInfo info = {};
 	atomic_meminfo_merge(&info, &data->info);
 	return info.alloc - info.free;
