@@ -475,6 +475,11 @@ push_socket_data(struct harbor *h, const struct skynet_socket_message * message)
 					return;
 				}
 				s->length = s->size[1] << 16 | s->size[2] << 8 | s->size[3];
+				if (s->length < HEADER_COOKIE_LENGTH) {
+					skynet_error(h->ctx, "Message is too short from harbor %d", id);
+					close_harbor(h,id);
+					return;
+				}
 				s->read = 0;
 				s->recv_buffer = skynet_malloc(s->length);
 				s->status = STATUS_CONTENT;
