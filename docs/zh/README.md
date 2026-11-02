@@ -1,87 +1,32 @@
-# Skynet 源码解析文档
+# 文档开发与部署
 
-这是 Skynet 游戏服务器框架的源码解析文档，使用 VitePress 构建。
+本站使用仓库现有的 VitePress 配置，中英文页面分别位于 docs/ 与 docs/zh/。
 
-## 本地开发
-
-### 安装依赖
-
-```bash
-npm install
-```
-
-### 启动开发服务器
-
-```bash
+```sh
+npm ci
+npm run docs:check
 npm run docs:dev
 ```
 
-访问 http://localhost:5173/skynet/ 查看文档。
+打开启动命令实际输出端口下的 `/skynet/zh/`。默认端口被占用时不要把其他应用当作本站。
 
-### 构建生产版本
-
-```bash
+```sh
 npm run docs:build
-```
-
-### 预览生产版本
-
-```bash
 npm run docs:preview
 ```
 
-## 文档结构
+构建目录是 `docs/.vitepress/dist`。基础路径为 `/skynet/`，中文入口为 `/skynet/zh/`；logo 位于 `docs/public/logo.svg`。
 
-```
-docs/
-├── index.md                    # 首页
-├── getting-started/            # 快速开始
-│   └── index.md
-├── architecture/               # 架构解析
-│   ├── overview.md            # 架构概览
-│   ├── actor-model.md         # Actor 模型
-│   └── ...
-├── analysis/                   # 源码分析
-│   ├── core-modules.md        # 核心模块概览
-│   ├── skynet-server.md       # skynet_server.c 分析
-│   └── ...
-├── public/                     # 静态资源
-│   └── logo.svg
-└── .vitepress/                 # VitePress 配置
-    ├── config.mjs             # 主配置文件
-    └── theme/                 # 自定义主题
-        ├── index.js
-        ├── style.css
-        └── components/
-            └── MermaidDiagram.vue
-```
+[package.json:7](https://github.com/cuihairu/skynet/blob/f9f8ae60b9ad287a69280f04ce6097e5c4c9f58b/package.json#L7); [docs/.vitepress/config.mjs:214](https://github.com/cuihairu/skynet/blob/f9f8ae60b9ad287a69280f04ce6097e5c4c9f58b/docs/.vitepress/config.mjs#L214)
 
-## 添加新文档
+## GitHub Pages 发布
 
-1. 在相应目录下创建 `.md` 文件
-2. 在 `docs/.vitepress/config.mjs` 的 sidebar 中添加链接
-3. 使用 Markdown 语法编写内容
+当前工作流在 master 分支的文档相关路径变化或手动触发时执行。它运行 npm ci、链接检查和文档构建，再上传 Pages artifact 并使用 deploy-pages 发布。仓库 Pages 设置应使用 GitHub Actions；不需要另建 gh-pages 分支，也不应执行旧文档中的强制推送脚本。
 
-## 部署
+[.github/workflows/deploy-docs.yml:12](https://github.com/cuihairu/skynet/blob/f9f8ae60b9ad287a69280f04ce6097e5c4c9f58b/.github/workflows/deploy-docs.yml#L12); [.github/workflows/deploy-docs.yml:63](https://github.com/cuihairu/skynet/blob/f9f8ae60b9ad287a69280f04ce6097e5c4c9f58b/.github/workflows/deploy-docs.yml#L63)
 
-文档可以部署到 GitHub Pages、Vercel、Netlify 等平台。
+英文入口：https://cuihairu.github.io/skynet/
 
-### GitHub Pages
+中文入口：https://cuihairu.github.io/skynet/zh/
 
-1. 在仓库设置中启用 GitHub Pages
-2. 选择 `gh-pages` 分支或 `docs/` 目录
-3. 推送代码后会自动部署
-
-### Vercel/Netlify
-
-1. 连接 GitHub 仓库
-2. 设置构建命令为 `npm run docs:build`
-3. 设置输出目录为 `docs/.vitepress/dist`
-
-## 贡献
-
-欢迎提交 Pull Request 来完善文档！
-
-## 许可证
-
-文档采用 MIT 许可证。
+自定义域名 cuihairu.site 在本轮未通过 TLS 检查，不列为已验证镜像。部署到其他平台时需要保留基础路径，或先修改配置并重新构建；这里不宣称已经部署到这些平台。

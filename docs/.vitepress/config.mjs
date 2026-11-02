@@ -47,7 +47,7 @@ const enSidebar = {
       items: [
         { text: "Lua VM Management", link: "/architecture/lua-vm" },
         { text: "Lua Services", link: "/architecture/lua-service" },
-        { text: "Hot Reload", link: "/architecture/hot-reload" }
+        { text: "Runtime Injection", link: "/architecture/hot-reload" }
       ]
     },
     {
@@ -151,7 +151,7 @@ const zhSidebar = {
       items: [
         { text: "Lua 虚拟机管理", link: "/zh/architecture/lua-vm" },
         { text: "Lua 服务", link: "/zh/architecture/lua-service" },
-        { text: "热更新机制", link: "/zh/architecture/hot-reload" }
+        { text: "运行时代码注入", link: "/zh/architecture/hot-reload" }
       ]
     },
     {

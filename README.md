@@ -1,82 +1,50 @@
-## ![skynet logo](https://github.com/cloudwu/skynet/wiki/image/skynet_metro.jpg)
+# Skynet
 
-Skynet is a multi-user Lua framework supporting the actor model, often used in games.
+<p align="center"><img src="docs/public/logo.svg" width="96" alt="Skynet logo"></p>
 
-[It is heavily used in the Chinese game industry](https://github.com/cloudwu/skynet/wiki/Uses), but is also now spreading to other industries, and to English-centric developers. To visit related sites, visit the Chinese pages using something like Google or Deepl translate.
+<p align="center"><a href="https://cuihairu.github.io/skynet/"><img src="https://img.shields.io/badge/docs-English-blue" alt="English documentation"></a> <a href="https://cuihairu.github.io/skynet/zh/"><img src="https://img.shields.io/badge/docs-简体中文-blue" alt="简体中文文档"></a> <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license"></a></p>
 
-The community is friendly and almost all contributors can speak English, so English speakers are welcome to ask questions in [Discussion](https://github.com/cloudwu/skynet/discussions), or submit issues in English.
+This repository is a fork of [cloudwu/skynet](https://github.com/cloudwu/skynet), a C/Lua actor framework, with English and Chinese source-reading notes. The notes cover selected runtime paths; they are not a complete API specification or an automatic hot-update system.
 
-## 源码解析文档
+[简体中文](README.zh-CN.md)
 
-本项目包含完整的源码解析文档，基于 VitePress 构建。文档深入分析 Skynet 的架构设计、核心机制和实现细节。
+## Documentation
 
-### 本地运行文档
+- [English documentation](https://cuihairu.github.io/skynet/)
+- [Build from source](docs/getting-started/build-from-source.md)
+- [Core API and configuration](docs/getting-started/api-reference.md)
+- [Architecture](docs/architecture/overview.md)
+- [Source entry points](docs/analysis/core-modules.md)
 
-```bash
-# 安装依赖
+The published site uses `/skynet/`; Chinese pages use `/skynet/zh/`. The verified public host is GitHub Pages. A custom-domain mirror is not advertised here because its TLS connection could not be verified in this audit.
 
-<p align="center">
-<a href="https://github.com/cuihairu/skynet/releases"><img alt="Status" src="https://img.shields.io/badge/status-in%20development-orange"></a>
-</p>
-npm install
+## Build and test
 
-# 启动文档服务器
+On Linux, install a C compiler, GNU Make and autoconf, then:
+
+```sh
+git clone https://github.com/cuihairu/skynet.git
+cd skynet
+make linux
+bash test/run_autotest.sh testcrypt testbson testsha testcoroutine testtimeout testresponse
+```
+
+The test helper starts temporary Skynet nodes. For an interactive example, run `./skynet examples/config` and `./3rd/lua/lua examples/client.lua` in separate terminals. Other platform targets are listed in [platform.mk](platform.mk); their presence is not a claim that every platform passed this local Linux audit.
+
+The bundled Lua source reports **5.5.1**, in [3rd/lua/lua.h](3rd/lua/lua.h).
+
+## Local documentation
+
+```sh
+npm ci
+npm run docs:check
 npm run docs:dev
 ```
 
-访问 http://localhost:5173/skynet/ 查看文档。
+After the development server starts, open the `/skynet/` path on the port it prints. The default requested port is 5173; an existing service may already occupy it. Build with `npm run docs:build` and preview with `npm run docs:preview`.
 
-### 文档结构
+## Upstream and license
 
-- **快速开始**：构建指南、项目结构、核心 API
-- **架构解析**：Actor 模型、消息驱动、服务调度、网络 I/O
-- **源码分析**：核心模块的详细源码分析
-
-### 文档内容
-
-- [架构概览](docs/zh/architecture/overview.md) - 整体架构设计
-- [Actor 模型](docs/zh/architecture/actor-model.md) - 核心设计范式
-- [消息驱动设计](docs/zh/architecture/message-driven.md) - 消息系统设计
-- [服务与模块](docs/zh/architecture/service-module.md) - 服务管理机制
-- [核心模块概览](docs/zh/analysis/core-modules.md) - C 核心模块分析
-
-英文文档在 `docs/` 根目录下同名路径，中文文档在 `docs/zh/` 下。
-
-## Build
-
-For Linux, install autoconf first for jemalloc:
-
-```
-git clone https://github.com/cloudwu/skynet.git
-cd skynet
-make 'PLATFORM'  # PLATFORM can be linux, macosx, freebsd, openbsd now
-```
-
-Or:
-
-```
-export PLAT=linux
-make
-```
-
-For FreeBSD , use gmake instead of make.
-
-## Test
-
-Run these in different consoles:
-
-```
-./skynet examples/config	# Launch first skynet node  (Gate server) and a skynet-master (see config for standalone option)
-./3rd/lua/lua examples/client.lua 	# Launch a client, and try to input hello.
-```
-
-## About Lua version
-
-Skynet now uses a modified version of lua 5.5.0 ( https://github.com/ejoy/lua/tree/skynet55 ) for multiple lua states.
-
-Official Lua versions can also be used as long as the Makefile is edited.
-
-## How To Use
-
-* Read Wiki for documents https://github.com/cloudwu/skynet/wiki (Written in both English and Chinese)
-* The FAQ in wiki https://github.com/cloudwu/skynet/wiki/FAQ (In Chinese, but you can visit them using something like Google or Deepl translate.)
+- [Upstream wiki](https://github.com/cloudwu/skynet/wiki)
+- [Upstream discussions](https://github.com/cloudwu/skynet/discussions)
+- [MIT license](LICENSE)
