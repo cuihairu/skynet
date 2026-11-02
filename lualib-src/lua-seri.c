@@ -444,6 +444,7 @@ static void unpack_one(lua_State *L, struct read_block *rb);
 
 static void
 unpack_table(lua_State *L, struct read_block *rb, int array_size) {
+	lua_Integer narray = array_size;
 	if (array_size == MAX_COOKIE-1) {
 		uint8_t type;
 		const uint8_t * t = (const uint8_t *)rb_read(rb, sizeof(type));
@@ -455,8 +456,16 @@ unpack_table(lua_State *L, struct read_block *rb, int array_size) {
 		if ((type & 7) != TYPE_NUMBER || cookie == TYPE_NUMBER_REAL) {
 			invalid_stream(L,rb);
 		}
-		array_size = get_integer(L,rb,cookie);
+		narray = get_integer(L,rb,cookie);
 	}
+	/* Each array element occupies at least one byte in the stream, so the
+	 * decoded array size cannot exceed the remaining bytes.  Bound it before
+	 * preallocating the table, otherwise a remote stream can claim a huge
+	 * array_size and trigger an OOM via lua_createtable. */
+	if (narray < 0 || narray > rb->len) {
+		invalid_stream(L,rb);
+	}
+	array_size = (int)narray;
 	luaL_checkstack(L,LUA_MINSTACK,NULL);
 	lua_createtable(L,array_size,0);
 	int i;

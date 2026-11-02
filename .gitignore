@@ -8,6 +8,7 @@
 /cservice
 /luaclib
 /test/test_malloc_hook
+/test/test_seri
 *.so
 *.dSYM
 .DS_Store

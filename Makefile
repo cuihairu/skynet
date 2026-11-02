@@ -123,17 +123,20 @@ clean :
   rm -rf $(SKYNET_BUILD_PATH)/*.dSYM $(CSERVICE_PATH)/*.dSYM $(LUA_CLIB_PATH)/*.dSYM
 	$(MAKE) clean -f mingw.mk
 
-# Standalone unit tests (C) that exercise malloc_hook internals.
-TEST_BIN = test/test_malloc_hook
-TEST_CFLAGS = -g -O2 -Wall -Iskynet-src -I$(LUA_INC) -I$(JEMALLOC_INC)
+# Standalone unit tests (C).
+TEST_BINS = test/test_malloc_hook test/test_seri
+TEST_CFLAGS = -g -O2 -Wall -Iskynet-src -Ilualib-src -I$(LUA_INC) -I$(JEMALLOC_INC)
 
 .PHONY: test
 
-$(TEST_BIN) : test/test_malloc_hook.c skynet-src/mem_info.c $(LUA_STATICLIB) $(MALLOC_STATICLIB)
+test/test_malloc_hook : test/test_malloc_hook.c skynet-src/mem_info.c $(LUA_STATICLIB) $(MALLOC_STATICLIB)
 	$(CC) $(TEST_CFLAGS) $^ $(LDFLAGS) $(SKYNET_LIBS) -o $@
 
-test : $(TEST_BIN)
-	$(TEST_BIN)
+test/test_seri : test/test_seri.c lualib-src/lua-seri.c $(LUA_STATICLIB)
+	$(CC) $(TEST_CFLAGS) $< $(LUA_STATICLIB) $(LDFLAGS) $(SKYNET_LIBS) -o $@
+
+test : $(TEST_BINS)
+	for test_bin in $^; do ./$$test_bin || exit 1; done
 
 cleanall: clean
 ifneq (,$(wildcard 3rd/jemalloc/Makefile))
