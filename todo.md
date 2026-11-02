@@ -4,7 +4,7 @@ P2/P3 items from the 2026-11-01 code review (docs/review/2026-11-01-code-review.
 
 ## P2
 
-- [ ] malloc_hook: hash collision on 24-bit handle slots corrupts mem_stats (uint64 underflow in dump_mem_lua) — skynet-src/malloc_hook.c:35,43,61,66-68
+- [x] malloc_hook: hash collision on 24-bit handle slots corrupts mem_stats (uint64 underflow in dump_mem_lua) — fixed 4be20e7 (skynet-src/malloc_hook.c:35,51-79,92-113; test/test_malloc_hook.c)
 - [ ] seri: unbounded lua_createtable prealloc from decoded array_size enables OOM via remote stream — lualib-src/lua-seri.c:447-461
 - [ ] bson: negative int32 field lengths desync bson_reader and allow 1-5 byte OOB reads (JSCODE/SYMBOL/CODEWS/DBPOINTER/BINARY + skip path) — lualib-src/lua-bson.c:648-660,712-733,768-782
 - [ ] logger: freopen return not re-checked, subsequent writes go to NULL — service-src/service_logger.c:53-66
