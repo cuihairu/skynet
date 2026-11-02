@@ -39,6 +39,11 @@
 
 #endif
 
+struct retired_logfile {
+	struct retired_logfile *next;
+	FILE *f;
+};
+
 struct skynet_context {
 	void * instance;
 	struct skynet_module * mod;
@@ -46,6 +51,10 @@ struct skynet_context {
 	skynet_cb cb;
 	struct message_queue *queue;
 	ATOM_POINTER logfile;
+	// A LOGOFF may race with a dispatch that already loaded logfile. The
+	// close is deferred to delete_context (ref == 0, no active dispatcher)
+	// through this lock-free list, instead of fclose in cmd_logoff.
+	ATOM_POINTER logfile_retired;
 	uint64_t cpu_cost;	// in microsec
 	uint64_t cpu_start;	// in microsec
 	char result[32];
@@ -141,6 +150,7 @@ skynet_context_new(const char * name, const char *param) {
 	ctx->cb_ud = NULL;
 	ctx->session_id = 0;
 	ATOM_INIT(&ctx->logfile, (uintptr_t)NULL);
+	ATOM_INIT(&ctx->logfile_retired, (uintptr_t)NULL);
 
 	ctx->init = false;
 	ctx->endless = false;
@@ -206,6 +216,15 @@ delete_context(struct skynet_context *ctx) {
 	FILE *f = (FILE *)ATOM_LOAD(&ctx->logfile);
 	if (f) {
 		fclose(f);
+	}
+	// ref == 0 here, no dispatcher is active, so the retired files are
+	// no longer in use and can be closed safely.
+	struct retired_logfile * r = (struct retired_logfile *)ATOM_LOAD(&ctx->logfile_retired);
+	while (r) {
+		struct retired_logfile * next = r->next;
+		fclose(r->f);
+		skynet_free(r);
+		r = next;
 	}
 	skynet_module_instance_release(ctx->mod, ctx->instance);
 	skynet_mq_mark_release(ctx->queue);
@@ -611,7 +630,20 @@ cmd_logoff(struct skynet_context * context, const char * param) {
 	if (f) {
 		// logfile may close in other thread
 		if (ATOM_CAS_POINTER(&ctx->logfile, (uintptr_t)f, (uintptr_t)NULL)) {
-			skynet_log_close(context, f, handle);
+			// A concurrent dispatch may still be writing to f, so the
+			// fclose is deferred to delete_context through the retired
+			// list. The file stays valid, so writing the close marker
+			// here is safe.
+			skynet_error(context, "Close log file :%08x", handle);
+			fprintf(f, "close time: %u\n", (uint32_t)skynet_now());
+			fflush(f);
+			struct retired_logfile * r = skynet_malloc(sizeof(*r));
+			r->f = f;
+			struct retired_logfile * head;
+			do {
+				head = (struct retired_logfile *)ATOM_LOAD(&ctx->logfile_retired);
+				r->next = head;
+			} while (!ATOM_CAS_POINTER(&ctx->logfile_retired, (uintptr_t)head, (uintptr_t)r));
 		}
 	}
 	skynet_context_release(ctx);
