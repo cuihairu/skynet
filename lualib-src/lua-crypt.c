@@ -409,7 +409,8 @@ static int
 padding_remove_pkcs7(const uint8_t *last) {
 	int padding = *last;
 	int i;
-	for (i=1;i<padding;i++) {
+	// valid pkcs7 padding is 1..8 bytes, don't scan further back
+	for (i=1;i<padding && i<8;i++) {
 		--last;
 		if (*last != padding)
 			return 0;	// invalid
