@@ -11,18 +11,14 @@ graph TB
     Start --> Server[skynet_server.c<br/>服务管理]
     Start --> Timer[skynet_timer.c<br/>定时器]
     Start --> Harbor[skynet_harbor.c<br/>集群]
+    Start --> Socket[socket_server.c<br/>网络 I/O 抽象层]
     
     Server --> MQ[skynet_mq.c<br/>消息队列]
     Server --> Handle[skynet_handle.c<br/>服务句柄]
     Server --> Module[skynet_module.c<br/>动态模块]
-    
-    MQ --> Socket[socket_server.c<br/>网络 I/O 抽象层]
-    Handle --> Socket
-    Module --> Socket
-    
-    Timer --> Socket
-    Harbor --> Socket
 ```
+
+socket_server.c 经由 skynet_socket.c 到达；它被 skynet_start.c（socket 线程）和 skynet_log.c 直接使用，而不是被队列、句柄、模块、定时器或集群模块直接使用。
 
 ## 核心模块列表
 
@@ -32,7 +28,7 @@ graph TB
 
 **核心函数**：
 - `skynet_start()`：系统入口点
-- `start_thread()`：创建工作线程
+- `create_thread()`：创建线程（封装 pthread_create）
 - `thread_worker()`：工作线程主循环
 
 **启动流程**：
@@ -58,9 +54,9 @@ struct skynet_context {
     uint32_t handle;          // 服务句柄
     int session_id;           // 会话 ID
     int ref;                  // 引用计数
-    char *name;               // 服务名称
 };
 ```
+服务名称存储在句柄表（skynet_handle.c）中，而非 `struct skynet_context` 中。
 
 **核心函数**：
 - `skynet_context_new()`：创建新服务
@@ -137,7 +133,8 @@ struct skynet_module {
 ```
 
 **核心函数**：
-- `skynet_module_create()`：创建模块实例
+- `skynet_module_instance_create()`：创建模块实例
+- `skynet_module_instance_init()`：初始化模块实例
 - `skynet_module_instance_release()`：释放模块实例
 - `skynet_module_query()`：查询模块
 
@@ -148,8 +145,8 @@ struct skynet_module {
 **核心数据结构**：
 ```c
 struct timer {
-    struct link_list near[4][64]; // 近期定时器（时间轮）
-    struct link_list far[4][64];  // 远期定时器
+    struct link_list near[TIME_NEAR]; // 256 个近槽（时间轮）
+    struct link_list t[4][TIME_LEVEL]; // 4 层 × 64 槽
     struct spinlock lock;         // 自旋锁
     uint32_t time;               // 当前时间
     uint32_t starttime;          // 启动时间
@@ -160,8 +157,8 @@ struct timer {
 
 **核心函数**：
 - `skynet_timer_init()`：初始化定时器
-- `skynet_timer_timeout()`：设置超时
-- `skynet_timer_update()`：更新定时器
+- `skynet_timeout()`：设置超时（厘秒）
+- `timer_update()`：推进并处理时间轮（静态）
 
 ### 7. socket_server.c - 网络 I/O
 
@@ -170,16 +167,18 @@ struct timer {
 **核心数据结构**：
 ```c
 struct socket {
+    uintptr_t opaque;          // 持有该 socket 的服务句柄
+    struct wb_list high;       // 高优先级写缓冲
+    struct wb_list low;        // 低优先级写缓冲
+    int64_t wb_size;           // 写缓冲大小
+    struct socket_stat stat;   // 单 socket 统计
     int fd;                    // 文件描述符
     int id;                    // socket ID
     int type;                  // socket 类型
-    int size;                  // 缓冲区大小
-    struct wb_list high;       // 高优先级写缓冲
-    struct wb_list low;        // 低优先级写缓冲
-    int stat;                  // 状态
-    int64_t wb_size;           // 写缓冲大小
-    uint32_t watching;         // 监控标志
-    void *p;                   // 用户数据
+    union {
+        int size;              // 读缓冲大小
+        uint8_t udp_address[UDP_ADDRESS_SIZE];
+    } p;                       // socket 专用载荷
 };
 ```
 
@@ -196,7 +195,7 @@ struct socket {
 **核心函数**：
 - `skynet_harbor_start()`：启动 Harbor
 - `skynet_harbor_send()`：发送跨节点消息
-- `skynet_harbor_register()`：注册全局服务
+- `skynet_harbor_message_isremote()`：判断句柄是否位于远端节点
 
 ### 9. skynet_daemon.c - 守护进程
 
@@ -212,7 +211,8 @@ struct socket {
 
 **核心函数**：
 - `skynet_error()`：记录错误日志
-- `skynet_log_init()`：初始化日志系统
+- `skynet_log_open()`：打开单服务日志文件
+- `skynet_log_close()`：关闭单服务日志文件
 
 ## 模块间通信
 
@@ -322,6 +322,25 @@ typedef int (*skynet_cb)(struct skynet_context *ctx,
     const void *msg, 
     size_t sz);
 ```
+
+## 源码引用
+
+| 源码 | 符号或设置 |
+| --- | --- |
+| [skynet-src/skynet_server.c:42](https://github.com/cuihairu/skynet/blob/f9f8ae60b9ad287a69280f04ce6097e5c4c9f58b/skynet-src/skynet_server.c#L42) | `struct skynet_context` |
+| [skynet-src/skynet_mq.c:12](https://github.com/cuihairu/skynet/blob/f9f8ae60b9ad287a69280f04ce6097e5c4c9f58b/skynet-src/skynet_mq.c#L12) | `DEFAULT_QUEUE_SIZE 64` |
+| [skynet-src/skynet_mq.c:19](https://github.com/cuihairu/skynet/blob/f9f8ae60b9ad287a69280f04ce6097e5c4c9f58b/skynet-src/skynet_mq.c#L19) | `MQ_OVERLOAD 1024` |
+| [skynet-src/skynet_timer.c:17](https://github.com/cuihairu/skynet/blob/f9f8ae60b9ad287a69280f04ce6097e5c4c9f58b/skynet-src/skynet_timer.c#L17) | `TIME_NEAR_SHIFT 8`（256 个近槽） |
+| [skynet-src/skynet_timer.c:19](https://github.com/cuihairu/skynet/blob/f9f8ae60b9ad287a69280f04ce6097e5c4c9f58b/skynet-src/skynet_timer.c#L19) | `TIME_LEVEL_SHIFT 6`（每层 64 槽） |
+| [skynet-src/skynet_timer.c:205](https://github.com/cuihairu/skynet/blob/f9f8ae60b9ad287a69280f04ce6097e5c4c9f58b/skynet-src/skynet_timer.c#L205) | `skynet_timeout(` |
+| [skynet-src/skynet_timer.c:166](https://github.com/cuihairu/skynet/blob/f9f8ae60b9ad287a69280f04ce6097e5c4c9f58b/skynet-src/skynet_timer.c#L166) | `timer_update(` |
+| [skynet-src/skynet_start.c:48](https://github.com/cuihairu/skynet/blob/f9f8ae60b9ad287a69280f04ce6097e5c4c9f58b/skynet-src/skynet_start.c#L48) | `create_thread(` |
+| [skynet-src/skynet_module.c:134](https://github.com/cuihairu/skynet/blob/f9f8ae60b9ad287a69280f04ce6097e5c4c9f58b/skynet-src/skynet_module.c#L134) | `skynet_module_instance_create(` |
+| [skynet-src/skynet_harbor.c:26](https://github.com/cuihairu/skynet/blob/f9f8ae60b9ad287a69280f04ce6097e5c4c9f58b/skynet-src/skynet_harbor.c#L26) | `skynet_harbor_message_isremote(` |
+| [skynet-src/skynet_log.c:9](https://github.com/cuihairu/skynet/blob/f9f8ae60b9ad287a69280f04ce6097e5c4c9f58b/skynet-src/skynet_log.c#L9) | `skynet_log_open(` |
+| [skynet-src/socket_server.c:90](https://github.com/cuihairu/skynet/blob/f9f8ae60b9ad287a69280f04ce6097e5c4c9f58b/skynet-src/socket_server.c#L90) | `struct socket` |
+
+以上结构体列表为简化版；完整字段集请对照固定引用的源码。引用固定到被审计提交。
 
 ## 下一步
 

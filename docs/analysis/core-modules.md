@@ -11,18 +11,14 @@ graph TB
     Start --> Server[skynet_server.c<br/>Service management]
     Start --> Timer[skynet_timer.c<br/>Timer]
     Start --> Harbor[skynet_harbor.c<br/>Cluster]
+    Start --> Socket[socket_server.c<br/>Network I/O abstraction layer]
 
     Server --> MQ[skynet_mq.c<br/>Message queue]
     Server --> Handle[skynet_handle.c<br/>Service handles]
     Server --> Module[skynet_module.c<br/>Dynamic modules]
-
-    MQ --> Socket[socket_server.c<br/>Network I/O abstraction layer]
-    Handle --> Socket
-    Module --> Socket
-
-    Timer --> Socket
-    Harbor --> Socket
 ```
+
+socket_server.c is reached through skynet_socket.c; it is used directly by skynet_start.c (socket thread) and skynet_log.c, not by the queue, handle, module, timer or harbor modules.
 
 ## Core Module List
 
@@ -32,7 +28,7 @@ graph TB
 
 **Key functions**:
 - `skynet_start()`: system entry point
-- `start_thread()`: create worker threads
+- `create_thread()`: create a thread (wraps pthread_create)
 - `thread_worker()`: worker thread main loop
 
 **Startup flow**:
@@ -58,9 +54,9 @@ struct skynet_context {
     uint32_t handle;          // service handle
     int session_id;           // session ID
     int ref;                  // reference count
-    char *name;               // service name
 };
 ```
+Service names are stored in the handle table (skynet_handle.c), not in `struct skynet_context`.
 
 **Key functions**:
 - `skynet_context_new()`: create a new service
@@ -137,7 +133,8 @@ struct skynet_module {
 ```
 
 **Key functions**:
-- `skynet_module_create()`: create a module instance
+- `skynet_module_instance_create()`: create a module instance
+- `skynet_module_instance_init()`: initialize a module instance
 - `skynet_module_instance_release()`: release a module instance
 - `skynet_module_query()`: query a module
 
@@ -148,8 +145,8 @@ struct skynet_module {
 **Core data structures**:
 ```c
 struct timer {
-    struct link_list near[4][64]; // near-term timers (timing wheel)
-    struct link_list far[4][64];  // far-term timers
+    struct link_list near[TIME_NEAR]; // 256 near slots (timing wheel)
+    struct link_list t[4][TIME_LEVEL]; // 4 levels of 64 slots
     struct spinlock lock;         // spinlock
     uint32_t time;               // current time
     uint32_t starttime;          // start time
@@ -160,8 +157,8 @@ struct timer {
 
 **Key functions**:
 - `skynet_timer_init()`: initialize the timer
-- `skynet_timer_timeout()`: set a timeout
-- `skynet_timer_update()`: update the timer
+- `skynet_timeout()`: set a timeout (centiseconds)
+- `timer_update()`: advance and process the timing wheel (static)
 
 ### 7. socket_server.c - Network I/O
 
@@ -170,16 +167,18 @@ struct timer {
 **Core data structures**:
 ```c
 struct socket {
+    uintptr_t opaque;          // service handle owning this socket
+    struct wb_list high;       // high-priority write buffer
+    struct wb_list low;        // low-priority write buffer
+    int64_t wb_size;           // write buffer size
+    struct socket_stat stat;   // per-socket statistics
     int fd;                    // file descriptor
     int id;                    // socket ID
     int type;                  // socket type
-    int size;                  // buffer size
-    struct wb_list high;       // high-priority write buffer
-    struct wb_list low;        // low-priority write buffer
-    int stat;                  // status
-    int64_t wb_size;           // write buffer size
-    uint32_t watching;         // monitoring flags
-    void *p;                   // user data
+    union {
+        int size;              // read buffer size
+        uint8_t udp_address[UDP_ADDRESS_SIZE];
+    } p;                       // socket-specific payload
 };
 ```
 
@@ -196,7 +195,7 @@ struct socket {
 **Key functions**:
 - `skynet_harbor_start()`: start Harbor
 - `skynet_harbor_send()`: send a cross-node message
-- `skynet_harbor_register()`: register a global service
+- `skynet_harbor_message_isremote()`: test whether a handle is on a remote node
 
 ### 9. skynet_daemon.c - Daemon
 
@@ -212,7 +211,8 @@ struct socket {
 
 **Key functions**:
 - `skynet_error()`: log an error message
-- `skynet_log_init()`: initialize the logging system
+- `skynet_log_open()`: open a per-service log file
+- `skynet_log_close()`: close a per-service log file
 
 ## Inter-Module Communication
 
@@ -322,6 +322,25 @@ typedef int (*skynet_cb)(struct skynet_context *ctx,
     const void *msg,
     size_t sz);
 ```
+
+## Source references
+
+| Source | Symbol or setting |
+| --- | --- |
+| [skynet-src/skynet_server.c:42](https://github.com/cuihairu/skynet/blob/f9f8ae60b9ad287a69280f04ce6097e5c4c9f58b/skynet-src/skynet_server.c#L42) | `struct skynet_context` |
+| [skynet-src/skynet_mq.c:12](https://github.com/cuihairu/skynet/blob/f9f8ae60b9ad287a69280f04ce6097e5c4c9f58b/skynet-src/skynet_mq.c#L12) | `DEFAULT_QUEUE_SIZE 64` |
+| [skynet-src/skynet_mq.c:19](https://github.com/cuihairu/skynet/blob/f9f8ae60b9ad287a69280f04ce6097e5c4c9f58b/skynet-src/skynet_mq.c#L19) | `MQ_OVERLOAD 1024` |
+| [skynet-src/skynet_timer.c:17](https://github.com/cuihairu/skynet/blob/f9f8ae60b9ad287a69280f04ce6097e5c4c9f58b/skynet-src/skynet_timer.c#L17) | `TIME_NEAR_SHIFT 8` (256 near slots) |
+| [skynet-src/skynet_timer.c:19](https://github.com/cuihairu/skynet/blob/f9f8ae60b9ad287a69280f04ce6097e5c4c9f58b/skynet-src/skynet_timer.c#L19) | `TIME_LEVEL_SHIFT 6` (64 slots per level) |
+| [skynet-src/skynet_timer.c:205](https://github.com/cuihairu/skynet/blob/f9f8ae60b9ad287a69280f04ce6097e5c4c9f58b/skynet-src/skynet_timer.c#L205) | `skynet_timeout(` |
+| [skynet-src/skynet_timer.c:166](https://github.com/cuihairu/skynet/blob/f9f8ae60b9ad287a69280f04ce6097e5c4c9f58b/skynet-src/skynet_timer.c#L166) | `timer_update(` |
+| [skynet-src/skynet_start.c:48](https://github.com/cuihairu/skynet/blob/f9f8ae60b9ad287a69280f04ce6097e5c4c9f58b/skynet-src/skynet_start.c#L48) | `create_thread(` |
+| [skynet-src/skynet_module.c:134](https://github.com/cuihairu/skynet/blob/f9f8ae60b9ad287a69280f04ce6097e5c4c9f58b/skynet-src/skynet_module.c#L134) | `skynet_module_instance_create(` |
+| [skynet-src/skynet_harbor.c:26](https://github.com/cuihairu/skynet/blob/f9f8ae60b9ad287a69280f04ce6097e5c4c9f58b/skynet-src/skynet_harbor.c#L26) | `skynet_harbor_message_isremote(` |
+| [skynet-src/skynet_log.c:9](https://github.com/cuihairu/skynet/blob/f9f8ae60b9ad287a69280f04ce6097e5c4c9f58b/skynet-src/skynet_log.c#L9) | `skynet_log_open(` |
+| [skynet-src/socket_server.c:90](https://github.com/cuihairu/skynet/blob/f9f8ae60b9ad287a69280f04ce6097e5c4c9f58b/skynet-src/socket_server.c#L90) | `struct socket` |
+
+Struct listings above are simplified; check the pinned source for the full field set. References are pinned to the audited commit.
 
 ## Next Steps
 
