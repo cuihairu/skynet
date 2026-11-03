@@ -55,9 +55,9 @@ write_pid(const char *pidfile) {
 	}
 
 	pid = getpid();
-	if (!fprintf(f,"%d\n", pid)) {
+	if (fprintf(f,"%d\n", pid) < 0) {
 		fprintf(stderr, "Can't write pid.\n");
-		close(fd);
+		fclose(f);
 		return 0;
 	}
 	fflush(f);
