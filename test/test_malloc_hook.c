@@ -10,6 +10,7 @@
  * distinct handles sharing a hash slot keep independent, balanced counters.
  */
 #include <assert.h>
+#include <pthread.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -21,13 +22,26 @@
 struct skynet_context;
 
 /* Stubs for symbols referenced by malloc_hook.c but not needed here. */
-uint32_t skynet_current_handle(void) { return 0; }
+static uint32_t CURRENT_HANDLE = 0;
+uint32_t skynet_current_handle(void) { return CURRENT_HANDLE; }
 void skynet_error(struct skynet_context *ctx, const char *fmt, ...) {
 	(void)ctx;
 	(void)fmt;
 }
 
 #include "../skynet-src/malloc_hook.c"
+
+static void *
+concurrent_worker(void *arg) {
+	uint32_t handle = (uint32_t)(uintptr_t)arg;
+	/* Interleave alloc/free for this handle while other threads may be
+	 * releasing the same slot or claiming a fresh one. */
+	for (int i = 0; i < 500; i++) {
+		update_xmalloc_stat_alloc(handle, 16);
+		update_xmalloc_stat_free(handle, 16);
+	}
+	return NULL;
+}
 
 /* Count entries in the table at the top of the stack. */
 static int
@@ -205,6 +219,45 @@ main(void) {
 			assert(m.alloc >= m.free);
 		}
 		ATOM_STORE(&d->handle, 0);
+	}
+
+	/* True multi-threaded alloc/free across distinct handles, plus one
+	 * thread that frees another thread's handle (cross-thread release). */
+	{
+		pthread_t th[5];
+		for (int i = 0; i < 4; i++) {
+			pthread_create(&th[i], NULL, concurrent_worker,
+				(void *)(uintptr_t)(0x1000 + i));
+		}
+		pthread_create(&th[4], NULL, concurrent_worker,
+			(void *)(uintptr_t)0x1000);	/* cross-thread frees of h=0x1000 */
+		for (int i = 0; i < 5; i++) {
+			pthread_join(th[i], NULL);
+		}
+		/* After balanced alloc/free, used memory for these handles is 0. */
+		uint32_t h = 0x1000;
+		CURRENT_HANDLE = h;
+		assert(malloc_current_memory() == 0);
+		CURRENT_HANDLE = 0;
+	}
+
+	/* Cross-thread free must not corrupt a slot claimed by another handle. */
+	{
+		uint32_t owner = 0x5001;
+		uint32_t other = 0x6001;
+		update_xmalloc_stat_alloc(owner, 64);
+		update_xmalloc_stat_free(owner, 64);	/* balanced, cross-thread style */
+		struct mem_data *owner_slot = find_mem_stat(owner, 1);
+		assert(owner_slot != NULL);
+		update_xmalloc_stat_alloc(other, 32);
+		CURRENT_HANDLE = owner;
+		assert(malloc_current_memory() == 0);
+		CURRENT_HANDLE = other;
+		assert(malloc_current_memory() == 32);
+		CURRENT_HANDLE = 0;
+		assert(malloc_memory_block() >= 1);
+		/* reserve=0 misses when the handle owns no slot. */
+		assert(find_mem_stat(0x7fffffff, 0) == NULL);
 	}
 
 	printf("test_malloc_hook: PASS\n");
