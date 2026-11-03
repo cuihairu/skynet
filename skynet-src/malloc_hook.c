@@ -56,11 +56,15 @@ hash_handle(uint32_t handle) {
 }
 
 // Locate the slot owned by handle, or (when reserve != 0) the first free slot
-// and reserve it for handle with a compare-exchange.  Returns NULL when the
-// table is full; the caller then drops the stat instead of corrupting it.
+// and reserve it for handle with a compare-exchange.  When no free slot is
+// available, reclaim a slot whose counters are balanced (no live allocations
+// from its previous owner) instead of returning NULL, so the table can serve
+// more handles than SLOT_SIZE over time.  Returns NULL only if every slot is
+// owned by a live allocation; the caller then drops the stat.
 static struct mem_data *
 find_mem_stat(uint32_t handle, int reserve) {
 	uint32_t h = hash_handle(handle);
+	struct mem_data *reclaim = NULL;
 	for (uint32_t i = 0; i < SLOT_SIZE; i++) {
 		struct mem_data *data = &mem_stats[(h + i) & (SLOT_SIZE - 1)];
 		uint32_t cur = (uint32_t)ATOM_LOAD(&data->handle);
@@ -74,6 +78,22 @@ find_mem_stat(uint32_t handle, int reserve) {
 				// the counters before any alloc/free is recorded.
 				atomic_meminfo_init(&data->info);
 				return data;
+			}
+		}
+		if (reserve && reclaim == NULL && cur != 0) {
+			// Remember a balanced slot owned by another (now inactive)
+			// handle so we can reuse it if the table is full.
+			if (ATOM_LOAD(&data->info.alloc_count) == ATOM_LOAD(&data->info.free_count)) {
+				reclaim = data;
+			}
+		}
+	}
+	if (reserve && reclaim) {
+		uint32_t cur = (uint32_t)ATOM_LOAD(&reclaim->handle);
+		if (cur != 0 && ATOM_LOAD(&reclaim->info.alloc_count) == ATOM_LOAD(&reclaim->info.free_count)) {
+			if (ATOM_CAS_ULONG(&reclaim->handle, cur, handle)) {
+				atomic_meminfo_init(&reclaim->info);
+				return reclaim;
 			}
 		}
 	}
@@ -105,13 +125,10 @@ update_xmalloc_stat_free(uint32_t handle, size_t __n) {
 	struct mem_data *data = find_mem_stat(handle, 0);
 	if (data) {
 		atomic_meminfo_free(&data->info, __n);
-		// Recycle the slot once this handle holds no live allocation so a
-		// long-running node does not exhaust the table with stale handles.
-		// A handle's alloc/free are serialised by its owning service thread,
-		// so no racing alloc can observe the half-reset slot.
-		if (ATOM_LOAD(&data->info.alloc_count) == ATOM_LOAD(&data->info.free_count)) {
-			ATOM_STORE(&data->handle, 0);
-		}
+		// The slot is not cleared here: a cross-thread free can race with the
+		// owning thread's alloc, and clearing would drop the alloc's counter
+		// and permanently skew that service's mem_stats.  Instead the slot is
+		// reclaimed lazily by find_mem_stat when a balanced slot is reused.
 	}
 }
 
