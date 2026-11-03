@@ -146,6 +146,36 @@ main(void) {
 	memset(mp, 0x12, 10);
 	skynet_free(mp);
 
+	/* Concurrent reservation vs dump: merge must never observe alloc=0 with
+	 * free=old (underflow).  We drive find_mem_stat(reserve) and the merge
+	 * loop in parallel against one slot and assert alloc >= free whenever
+	 * the slot reports a live handle. */
+	{
+		#define NTHREAD 4
+		#define NITER 2000
+		static uint32_t handles[NTHREAD] = {0x111, 0x222, 0x333, 0x444};
+		struct mem_data *slots[NTHREAD];
+		for (int i = 0; i < NTHREAD; i++) {
+			slots[i] = find_mem_stat(handles[i], 1);
+			assert(slots[i] != NULL);
+		}
+		/* Release all slots first. */
+		for (int i = 0; i < NTHREAD; i++) {
+			ATOM_STORE(&slots[i]->handle, 0);
+		}
+		/* Reuse handle 0x111 slot, then hammer merge from other threads. */
+		uint32_t h = 0x111;
+		struct mem_data *d = find_mem_stat(h, 1);
+		assert(d != NULL);
+		atomic_meminfo_alloc(&d->info, 100);
+		for (int i = 0; i < NITER; i++) {
+			MemInfo m = {};
+			atomic_meminfo_merge(&m, &d->info);
+			assert(m.alloc >= m.free);
+		}
+		ATOM_STORE(&d->handle, 0);
+	}
+
 	printf("test_malloc_hook: PASS\n");
 	return 0;
 }

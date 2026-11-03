@@ -50,10 +50,14 @@ meminfo_merge(MemInfo *dest, const MemInfo *src) {
 void
 atomic_meminfo_merge(MemInfo *dest, const AtomicMemInfo *src) {
     MemInfo info;
-    // 先加载 free 后加载 alloc 避免大小错乱
-    info.free_count = ATOM_LOAD(&src->free_count);
-    info.free = ATOM_LOAD(&src->free);
+    // Load alloc before free to match the init order in atomic_meminfo_init
+    // (alloc first, then free).  A concurrent dump that observes the slot
+    // between reservation and init then sees either the old pair (both old)
+    // or the new pair (both zero) instead of alloc=0 with free=old, which
+    // would underflow dest->alloc - dest->free.
     info.alloc_count = ATOM_LOAD(&src->alloc_count);
     info.alloc = ATOM_LOAD(&src->alloc);
+    info.free_count = ATOM_LOAD(&src->free_count);
+    info.free = ATOM_LOAD(&src->free);
     meminfo_merge(dest, &info);
 }
