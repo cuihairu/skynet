@@ -10,6 +10,7 @@
 /test/test_malloc_hook
 /test/test_seri
 /test/test_bson
+/test/test_logger
 *.so
 *.dSYM
 .DS_Store

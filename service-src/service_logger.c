@@ -50,7 +50,18 @@ logger_cb(struct skynet_context * context, void *ud, int type, int session, uint
 	switch (type) {
 	case PTYPE_SYSTEM:
 		if (inst->filename) {
-			inst->handle = freopen(inst->filename, "a", inst->handle);
+			/* fopen a fresh stream, then swap it in only on success so a
+			 * failed reopen never leaves a NULL/closed handle in place
+			 * (freopen would also close the old stream on failure). */
+			FILE * new = fopen(inst->filename, "a");
+			if (new != NULL) {
+				if (inst->close) {
+					fclose(inst->handle);
+				}
+				inst->handle = new;
+			} else {
+				skynet_error(context, "reopen log file %s failed", inst->filename);
+			}
 		}
 		break;
 	case PTYPE_TEXT:
