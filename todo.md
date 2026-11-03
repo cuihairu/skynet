@@ -18,7 +18,7 @@ P2/P3 items from the 2026-11-01 code review (docs/review/2026-11-01-code-review.
 - [x] sharedata: nested convtable leaks ctx->tbl children when lua_call raises — fixed 91a058a (lualib-src/lua-sharedata.c:151-182; test/test_sharedata.c)
 - [x] module: open_sym failure leaks dlopen handle — fixed cbe40d5 (skynet-src/skynet_module.c:120-130; test/test_module.c)
 - [x] daemon: fprintf-failure path never fcloses the fdopen FILE* — fixed bda6d0e (skynet-src/skynet_daemon.c:58-65; test/test_daemon.c)
-- [ ] error: static logger handle read/written without atomics — skynet-src/skynet_error.c:34-37
+- [x] error: static logger handle read/written without atomics — fixed 307e815 (skynet-src/skynet_error.c:34-55; test/test_error.c)
 - [ ] malloc_hook: dead APIs with latent bugs (div-by-zero, aligned_alloc, posix_memalign) — skynet-src/malloc_hook.c:200,232,240
 - [ ] handle: verify slot-grow reader safety and handle_reader_slot TLS recycle under pressure (speculative) — skynet-src/skynet_handle.c:127+
 
