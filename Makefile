@@ -124,7 +124,7 @@ clean :
 	$(MAKE) clean -f mingw.mk
 
 # Standalone unit tests (C).
-TEST_BINS = test/test_malloc_hook test/test_seri
+TEST_BINS = test/test_malloc_hook test/test_seri test/test_bson
 TEST_CFLAGS = -g -O2 -Wall -Iskynet-src -Ilualib-src -I$(LUA_INC) -I$(JEMALLOC_INC)
 
 .PHONY: test
@@ -134,6 +134,9 @@ test/test_malloc_hook : test/test_malloc_hook.c skynet-src/mem_info.c $(LUA_STAT
 
 test/test_seri : test/test_seri.c lualib-src/lua-seri.c $(LUA_STATICLIB)
 	$(CC) $(TEST_CFLAGS) $< $(LUA_STATICLIB) $(LDFLAGS) $(SKYNET_LIBS) -o $@
+
+test/test_bson : test/test_bson.c lualib-src/lua-bson.c $(LUA_STATICLIB)
+	$(CC) $(TEST_CFLAGS) -std=gnu11 $< $(LUA_STATICLIB) $(LDFLAGS) $(SKYNET_LIBS) -o $@
 
 test : $(TEST_BINS)
 	for test_bin in $^; do ./$$test_bin || exit 1; done
