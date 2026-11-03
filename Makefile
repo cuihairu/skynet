@@ -123,9 +123,13 @@ clean :
   rm -rf $(SKYNET_BUILD_PATH)/*.dSYM $(CSERVICE_PATH)/*.dSYM $(LUA_CLIB_PATH)/*.dSYM
 	$(MAKE) clean -f mingw.mk
 
-# Standalone unit tests (C).
-TEST_BINS = test/test_malloc_hook test/test_seri test/test_bson test/test_logger test/test_mongo test/test_socket test/test_sharedata test/test_module test/test_daemon test/test_error
-TEST_CFLAGS = -g -O2 -Wall -Iskynet-src -Ilualib-src -I$(LUA_INC) -I$(JEMALLOC_INC)
+# Standalone unit tests (C).  test_malloc_hook exercises the jemalloc-backed
+# malloc_hook counters, so it is only built when jemalloc is available.
+TEST_BINS = test/test_seri test/test_bson test/test_logger test/test_mongo test/test_socket test/test_sharedata test/test_module test/test_daemon test/test_error
+ifneq ($(MALLOC_STATICLIB),)
+TEST_BINS += test/test_malloc_hook
+endif
+TEST_CFLAGS = -g -O2 -Wall -Iskynet-src -Ilualib-src -I$(LUA_INC) -I$(JEMALLOC_INC) $(SKYNET_DEFINES)
 
 .PHONY: test
 
