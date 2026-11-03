@@ -18,3 +18,7 @@ void *dlsym(void *dl, const char *sym) {
     return GetProcAddress(dl, sym);
 }
 
+
+void dlclose(void *dl) {
+    FreeLibrary((HMODULE)dl);
+}
