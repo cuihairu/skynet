@@ -120,6 +120,7 @@ stringindex(struct context *ctx, const char * str, size_t sz) {
 }
 
 static int convtable(lua_State *L);
+static void delete_tbl(struct table *tbl);
 
 static void
 setvalue(struct context * ctx, lua_State *L, int index, struct node *n) {
@@ -158,12 +159,23 @@ setvalue(struct context * ctx, lua_State *L, int index, struct node *n) {
 		}
 		memset(ctx->tbl, 0, sizeof(struct table));
 		int absidx = lua_absindex(L, index);
+		int err;
 
 		lua_pushcfunction(L, convtable);
 		lua_pushvalue(L, absidx);
 		lua_pushlightuserdata(L, ctx);
 
-		lua_call(L, 2, 0);
+		err = lua_pcall(L, 2, 0, 0);
+		if (err != LUA_OK) {
+			// The nested conversion raised.  Free the partially built
+			// table (and any descendants already allocated) before
+			// propagating the error.
+			struct table * leaked = ctx->tbl;
+			ctx->tbl = tbl;
+			delete_tbl(leaked);
+			lua_error(L);
+			return;
+		}
 
 		n->v.tbl = ctx->tbl;
 		n->valuetype = VALUETYPE_TABLE;

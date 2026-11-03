@@ -13,6 +13,7 @@
 /test/test_logger
 /test/test_mongo
 /test/test_socket
+/test/test_sharedata
 *.so
 *.dSYM
 .DS_Store
