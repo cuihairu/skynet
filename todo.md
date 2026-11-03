@@ -24,7 +24,7 @@ P2/P3 items from the 2026-11-01 code review (docs/review/2026-11-01-code-review.
 
 ## 审核 2026-11-03（c9bed64a..HEAD）
 
-- [ ] 审核发现：find_mem_stat 认领槽位后 atomic_meminfo_init 非原子清零（先 alloc 后 free），而 atomic_meminfo_merge 先读 free 后读 alloc，并发 dump 可读到 alloc=0/free=旧值，dump_mem_lua 的 info.alloc-info.free 与 malloc_used_memory 的 total.alloc-total.free 瞬时下溢为巨大值，重新引入本提交声称消除的症状（skynet-src/malloc_hook.c:75,340,403；skynet-src/mem_info.c:56-62）
+- [x] 审核发现：find_mem_stat 认领槽位后 atomic_meminfo_init 非原子清零（先 alloc 后 free），而 atomic_meminfo_merge 先读 free 后读 alloc，并发 dump 可读到 alloc=0/free=旧值，dump_mem_lua 的 info.alloc-info.free 与 malloc_used_memory 的 total.alloc-total.free 瞬时下溢为巨大值，重新引入本提交声称消除的症状（skynet-src/malloc_hook.c:75,340,403；skynet-src/mem_info.c:56-62） — 属实，fixed dff3775（skynet-src/mem_info.c:56-66；test/test_malloc_hook.c）
 - [ ] 审核发现：回收逻辑注释假定“同一 handle 的 alloc/free 由所属服务线程串行”，但 clean_prefix 用 cookie 中记录的原分配 handle，块可被其他服务线程释放；当 H 最后一块被跨线程释放使槽位回收（handle=0）并立即被 handle K 经 CAS+清零重新认领时，H 线程仍持有的过期槽指针会把 H 的分配记到 K 的计数上，随后 find_mem_stat(H,0) 找不到槽位而丢弃 free，导致单服务 mem_stats 永久偏差（skynet-src/malloc_hook.c:105-115）
 - [ ] 审核发现：find_mem_stat 表满或 handle 缺失时静默返回 NULL 丢弃统计；free 路径在 handle 缺失时需扫描全部 65536 槽位（约 4MB 缓存行），存在统计少报与性能陡降风险（skynet-src/malloc_hook.c:61-81）
 - [ ] 审核发现：make test 目标硬编码 -Iskynet-src -I$(JEMALLOC_INC) 并链接 $(MALLOC_STATICLIB)，NOUSE_JEMALLOC/非 jemalloc 平台构建会失败，且未传递 $(SKYNET_DEFINES)（如 MEMORY_CHECK/THREAD_SAFE），与主构建不一致（Makefile:128-138）
