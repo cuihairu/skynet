@@ -16,7 +16,7 @@ P2/P3 items from the 2026-11-01 code review (docs/review/2026-11-01-code-review.
 - [x] mongo: reply rawlen memcpy without min-length check — lualib-src/lua-mongo.c:214-218
 - [x] socket: ludp_address reads port before size validation — fixed 22c5507 (lualib-src/lua-socket.c:750-765; test/test_socket.c)
 - [x] sharedata: nested convtable leaks ctx->tbl children when lua_call raises — fixed 91a058a (lualib-src/lua-sharedata.c:151-182; test/test_sharedata.c)
-- [ ] module: open_sym failure leaks dlopen handle — skynet-src/skynet_module.c:120-125
+- [x] module: open_sym failure leaks dlopen handle — fixed cbe40d5 (skynet-src/skynet_module.c:120-130; test/test_module.c)
 - [ ] daemon: fprintf-failure path never fcloses the fdopen FILE* — skynet-src/skynet_daemon.c:58-61
 - [ ] error: static logger handle read/written without atomics — skynet-src/skynet_error.c:34-37
 - [ ] malloc_hook: dead APIs with latent bugs (div-by-zero, aligned_alloc, posix_memalign) — skynet-src/malloc_hook.c:200,232,240
