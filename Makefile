@@ -124,7 +124,7 @@ clean :
 	$(MAKE) clean -f mingw.mk
 
 # Standalone unit tests (C).
-TEST_BINS = test/test_malloc_hook test/test_seri test/test_bson test/test_logger test/test_mongo test/test_socket test/test_sharedata
+TEST_BINS = test/test_malloc_hook test/test_seri test/test_bson test/test_logger test/test_mongo test/test_socket test/test_sharedata test/test_module
 TEST_CFLAGS = -g -O2 -Wall -Iskynet-src -Ilualib-src -I$(LUA_INC) -I$(JEMALLOC_INC)
 
 .PHONY: test
@@ -149,6 +149,15 @@ test/test_socket : test/test_socket.c lualib-src/lua-socket.c $(LUA_STATICLIB)
 
 test/test_sharedata : test/test_sharedata.c lualib-src/lua-sharedata.c $(LUA_STATICLIB)
 	$(CC) $(TEST_CFLAGS) $< $(LUA_STATICLIB) $(LDFLAGS) $(SKYNET_LIBS) -o $@
+
+test/module_without_init.so : test/module_without_init.c
+	$(CC) $(TEST_CFLAGS) -fPIC -shared $< -o $@
+
+test/module_with_init.so : test/module_with_init.c
+	$(CC) $(TEST_CFLAGS) -fPIC -shared $< -o $@
+
+test/test_module : test/test_module.c skynet-src/skynet_module.c test/module_without_init.so test/module_with_init.so
+	$(CC) $(TEST_CFLAGS) $< -ldl -lpthread -o $@
 
 test/testdns_hosts : test/testdns_hosts.lua 3rd/lua/lua
 	@echo "LUA test: $<"

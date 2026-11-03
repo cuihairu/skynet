@@ -121,6 +121,12 @@ skynet_module_query(const char * name) {
 				M->m[index].name = skynet_strdup(name);
 				M->count ++;
 				result = &M->m[index];
+			} else {
+				// The module loaded but does not provide the required
+				// _init symbol; close the handle so it is not leaked.
+				dlclose(dl);
+				M->m[index].module = NULL;
+				M->m[index].name = NULL;
 			}
 		}
 	}

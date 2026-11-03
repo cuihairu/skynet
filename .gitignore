@@ -14,6 +14,9 @@
 /test/test_mongo
 /test/test_socket
 /test/test_sharedata
+/test/test_module
+/test/module_without_init.so
+/test/module_with_init.so
 *.so
 *.dSYM
 .DS_Store
