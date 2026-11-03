@@ -16,6 +16,7 @@
 /test/test_sharedata
 /test/test_module
 /test/test_daemon
+/test/test_error
 /test/module_without_init.so
 /test/module_with_init.so
 *.so

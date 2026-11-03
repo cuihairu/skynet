@@ -3,6 +3,7 @@
 #include "skynet_imp.h"
 #include "skynet_mq.h"
 #include "skynet_server.h"
+#include "atomic.h"
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -31,11 +32,18 @@ log_try_vasprintf(char **strp, const char *fmt, va_list ap) {
 
 void
 skynet_error(struct skynet_context * context, const char *msg, ...) {
-	static uint32_t logger = 0;
-	if (logger == 0) {
-		logger = skynet_handle_findname("logger");
+	static ATOM_INT logger = 0;
+	uint32_t logger_handle = ATOM_LOAD(&logger);
+	if (logger_handle == 0) {
+		logger_handle = skynet_handle_findname("logger");
+		uint32_t old = 0;
+		if (logger_handle != 0) {
+			ATOM_CAS(&logger, old, (int)logger_handle);
+			// If another thread stored a value first, use it.
+			logger_handle = (uint32_t)ATOM_LOAD(&logger);
+		}
 	}
-	if (logger == 0) {
+	if (logger_handle == 0) {
 		return;
 	}
 
@@ -72,5 +80,5 @@ skynet_error(struct skynet_context * context, const char *msg, ...) {
 	smsg.session = 0;
 	smsg.data = data;
 	smsg.sz = len | ((size_t)PTYPE_TEXT << MESSAGE_TYPE_SHIFT);
-	skynet_context_push(logger, &smsg);
+	skynet_context_push(logger_handle, &smsg);
 }
