@@ -145,6 +145,7 @@ local function parse_hosts()
 		
 		::continue::
 	end
+	f:close()
 	return rts
 end
 

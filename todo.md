@@ -11,7 +11,7 @@ P2/P3 items from the 2026-11-01 code review (docs/review/2026-11-01-code-review.
 
 ## P3
 
-- [ ] dns: parse_hosts leaks io.open handle on all return paths — lualib/skynet/dns.lua:110-148
+- [x] dns: parse_hosts leaks io.open handle on all return paths — lualib/skynet/dns.lua:110-148
 - [ ] mongo: OP_MSG data_len == sizeof(header) reads past buffer — lualib-src/lua-mongo.c:160-201
 - [ ] mongo: reply rawlen memcpy without min-length check — lualib-src/lua-mongo.c:214-218
 - [ ] socket: ludp_address reads port before size validation — lualib-src/lua-socket.c:750-759

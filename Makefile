@@ -141,8 +141,15 @@ test/test_bson : test/test_bson.c lualib-src/lua-bson.c $(LUA_STATICLIB)
 test/test_logger : test/test_logger.c service-src/service_logger.c $(LUA_STATICLIB)
 	$(CC) $(TEST_CFLAGS) $< $(LUA_STATICLIB) $(LDFLAGS) $(SKYNET_LIBS) -o $@
 
+test/testdns_hosts : test/testdns_hosts.lua 3rd/lua/lua
+	@echo "LUA test: $<"
+
+3rd/lua/lua : 3rd/lua/lua.c 3rd/lua/liblua.a
+	cd 3rd/lua && $(MAKE) lua
+
 test : $(TEST_BINS)
 	for test_bin in $^; do ./$$test_bin || exit 1; done
+	./3rd/lua/lua test/testdns_hosts.lua
 
 cleanall: clean
 ifneq (,$(wildcard 3rd/jemalloc/Makefile))
