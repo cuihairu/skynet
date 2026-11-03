@@ -20,7 +20,7 @@ P2/P3 items from the 2026-11-01 code review (docs/review/2026-11-01-code-review.
 - [x] daemon: fprintf-failure path never fcloses the fdopen FILE* — fixed bda6d0e (skynet-src/skynet_daemon.c:58-65; test/test_daemon.c)
 - [x] error: static logger handle read/written without atomics — fixed 307e815 (skynet-src/skynet_error.c:34-55; test/test_error.c)
 - [x] malloc_hook: dead APIs with latent bugs (div-by-zero, aligned_alloc, posix_memalign) — fixed 24961cb (skynet-src/malloc_hook.c:246-300; test/test_malloc_hook.c)
-- [ ] handle: verify slot-grow reader safety and handle_reader_slot TLS recycle under pressure (speculative) — skynet-src/skynet_handle.c:127+
+- [x] handle: verify slot-grow reader safety and handle_reader_slot TLS recycle under pressure (speculative) — 不属实：slot 扩容在 handle_wlock 写锁下完成且写锁等待全部 slot reader active 清零，读者不会在 grow 期间读旧数组；worker 线程数固定且每线程仅 register_thread 一次，thread_idx 不会超过 rslot_count，TLS slot 不回收无害，未发现并发缺陷
 
 ## 审核 2026-11-03（c9bed64a..HEAD）
 
