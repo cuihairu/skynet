@@ -12,6 +12,7 @@
 /test/test_bson
 /test/test_logger
 /test/test_mongo
+/test/test_socket
 *.so
 *.dSYM
 .DS_Store

@@ -124,7 +124,7 @@ clean :
 	$(MAKE) clean -f mingw.mk
 
 # Standalone unit tests (C).
-TEST_BINS = test/test_malloc_hook test/test_seri test/test_bson test/test_logger test/test_mongo
+TEST_BINS = test/test_malloc_hook test/test_seri test/test_bson test/test_logger test/test_mongo test/test_socket
 TEST_CFLAGS = -g -O2 -Wall -Iskynet-src -Ilualib-src -I$(LUA_INC) -I$(JEMALLOC_INC)
 
 .PHONY: test
@@ -142,6 +142,9 @@ test/test_logger : test/test_logger.c service-src/service_logger.c $(LUA_STATICL
 	$(CC) $(TEST_CFLAGS) $< $(LUA_STATICLIB) $(LDFLAGS) $(SKYNET_LIBS) -o $@
 
 test/test_mongo : test/test_mongo.c lualib-src/lua-mongo.c $(LUA_STATICLIB)
+	$(CC) $(TEST_CFLAGS) $< $(LUA_STATICLIB) $(LDFLAGS) $(SKYNET_LIBS) -o $@
+
+test/test_socket : test/test_socket.c lualib-src/lua-socket.c $(LUA_STATICLIB)
 	$(CC) $(TEST_CFLAGS) $< $(LUA_STATICLIB) $(LDFLAGS) $(SKYNET_LIBS) -o $@
 
 test/testdns_hosts : test/testdns_hosts.lua 3rd/lua/lua

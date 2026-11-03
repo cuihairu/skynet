@@ -750,6 +750,9 @@ static int
 ludp_address(lua_State *L) {
 	size_t sz = 0;
 	const uint8_t * addr = (const uint8_t *)luaL_checklstring(L, 1, &sz);
+	if (sz != 1+2+4 && sz != 1+2+16) {
+		return luaL_error(L, "Invalid udp address");
+	}
 	uint16_t port = 0;
 	memcpy(&port, addr+1, sizeof(uint16_t));
 	port = ntohs(port);
@@ -759,9 +762,6 @@ ludp_address(lua_State *L) {
 	if (sz == 1+2+4) {
 		family = AF_INET;
 	} else {
-		if (sz != 1+2+16) {
-			return luaL_error(L, "Invalid udp address");
-		}
 		family = AF_INET6;
 	}
 	if (inet_ntop(family, src, tmp, sizeof(tmp)) == NULL) {
