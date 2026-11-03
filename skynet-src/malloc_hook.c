@@ -244,6 +244,11 @@ skynet_free(void *ptr) {
 
 void *
 skynet_calloc(size_t nmemb, size_t size) {
+	if (size == 0) {
+		// Avoid division by zero when the element size is zero.  C allows
+		// calloc(n, 0) to return NULL, so honour that here.
+		return NULL;
+	}
 	uint32_t cookie_n = (PREFIX_SIZE+size-1)/size;
 	void* ptr = je_calloc(nmemb + cookie_n, size);
 	if(!ptr) malloc_oom(nmemb * size);
@@ -276,7 +281,11 @@ skynet_memalign(size_t alignment, size_t size) {
 void *
 skynet_aligned_alloc(size_t alignment, size_t size) {
 	uint32_t cookie_size = alignment_cookie_size(alignment);
-	void* ptr = je_aligned_alloc(alignment, size + cookie_size);
+	// aligned_alloc requires the size to be an integral multiple of the
+	// alignment.  Round the allocation up so the constraint holds while
+	// still returning at least `size` usable bytes to the caller.
+	size_t alloc_size = (size + alignment - 1) / alignment * alignment;
+	void* ptr = je_aligned_alloc(alignment, alloc_size + cookie_size);
 	if(!ptr) malloc_oom(size);
 	return fill_prefix(ptr, size, cookie_size);
 }
@@ -285,7 +294,11 @@ int
 skynet_posix_memalign(void **memptr, size_t alignment, size_t size) {
 	uint32_t cookie_size = alignment_cookie_size(alignment);
 	int err = je_posix_memalign(memptr, alignment, size + cookie_size);
-	if (err) malloc_oom(size);
+	if (err) {
+		// On failure posix_memalign leaves *memptr unmodified, so do not
+		// dereference it.
+		return err;
+	}
 	*memptr = fill_prefix(*memptr, size, cookie_size);
 	return err;
 }

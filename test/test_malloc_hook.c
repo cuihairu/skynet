@@ -117,6 +117,35 @@ main(void) {
 
 	lua_close(L);
 
+	/* Dead-but-public aligned APIs: exercise the latent-bug fixes. */
+	void *p = skynet_calloc(4, 0);
+	assert(p == NULL);
+
+	p = skynet_calloc(4, 8);
+	assert(p != NULL);
+	memset(p, 0xAB, 32);
+	skynet_free(p);
+
+	p = skynet_aligned_alloc(16, 10);
+	assert(p != NULL);
+	assert(((uintptr_t)p & 15) == 0);
+	memset(p, 0xCD, 10);
+	skynet_free(p);
+
+	p = skynet_memalign(16, 10);
+	assert(p != NULL);
+	assert(((uintptr_t)p & 15) == 0);
+	memset(p, 0xEF, 10);
+	skynet_free(p);
+
+	void *mp = NULL;
+	int err = skynet_posix_memalign(&mp, 16, 10);
+	assert(err == 0);
+	assert(mp != NULL);
+	assert(((uintptr_t)mp & 15) == 0);
+	memset(mp, 0x12, 10);
+	skynet_free(mp);
+
 	printf("test_malloc_hook: PASS\n");
 	return 0;
 }
