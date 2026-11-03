@@ -187,6 +187,12 @@ unpack_reply(lua_State *L) {
 	}
 
 	int sz = (int)data_len - sizeof(*h);
+	if (sz < 1 + (int)sizeof(int32_t)) {
+		/* Need at least the payload type byte plus a 4-byte document
+		 * length; otherwise the section pointer (and get_length) reads
+		 * past the buffer. */
+		return luaL_error(L, "Unsupported OP_MSG reply: truncated");
+	}
 
 	const uint8_t * section = (const uint8_t *)(h+1);
 
@@ -212,7 +218,11 @@ unpack_reply(lua_State *L) {
 // return integer
 static int
 reply_length(lua_State *L) {
-	const char * rawlen_str = luaL_checkstring(L, 1);
+	size_t str_len = 0;
+	const char * rawlen_str = luaL_checklstring(L, 1, &str_len);
+	if (str_len < sizeof(int)) {
+		return luaL_error(L, "Invalid mongo reply length string");
+	}
 	int rawlen = 0;
 	memcpy(&rawlen, rawlen_str, sizeof(int));
 	int length = little_endian(rawlen);

@@ -12,8 +12,8 @@ P2/P3 items from the 2026-11-01 code review (docs/review/2026-11-01-code-review.
 ## P3
 
 - [x] dns: parse_hosts leaks io.open handle on all return paths — lualib/skynet/dns.lua:110-148
-- [ ] mongo: OP_MSG data_len == sizeof(header) reads past buffer — lualib-src/lua-mongo.c:160-201
-- [ ] mongo: reply rawlen memcpy without min-length check — lualib-src/lua-mongo.c:214-218
+- [x] mongo: OP_MSG data_len == sizeof(header) reads past buffer — lualib-src/lua-mongo.c:160-201
+- [x] mongo: reply rawlen memcpy without min-length check — lualib-src/lua-mongo.c:214-218
 - [ ] socket: ludp_address reads port before size validation — lualib-src/lua-socket.c:750-759
 - [ ] sharedata: nested convtable leaks ctx->tbl children when lua_call raises — lualib-src/lua-sharedata.c:151-174
 - [ ] module: open_sym failure leaks dlopen handle — skynet-src/skynet_module.c:120-125
