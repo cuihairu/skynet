@@ -10,8 +10,10 @@ meminfo_init(MemInfo *info) {
 void
 atomic_meminfo_init(AtomicMemInfo *info) {
     /* Store free before alloc so a concurrent merge that reads free
-     * first always sees free <= alloc.  ATOM_STORE is seq_cst, which
-     * also provides the ordering needed on weak memory models. */
+     * first always sees free <= alloc.  ATOM_STORE is seq_cst when
+     * <stdatomic.h>/<atomic> is available; under __STDC_NO_ATOMICS__
+     * it degrades to a plain store with no ordering guarantee, which
+     * is the best this fallback can provide. */
     ATOM_STORE(&info->free_count, 0);
     ATOM_STORE(&info->free, 0);
     ATOM_STORE(&info->alloc_count, 0);

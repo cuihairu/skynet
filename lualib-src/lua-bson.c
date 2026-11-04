@@ -94,7 +94,7 @@ bson_reserve(struct bson *b, int sz) {
 
 static inline void
 check_reader(lua_State *L, struct bson_reader *br, size_t sz) {
-	if ((size_t)br->size < sz) {
+	if (br->size < 0 || (size_t)br->size < sz) {
 		luaL_error(L, "Invalid bson block (%d:%zu)", br->size, sz);
 	}
 }

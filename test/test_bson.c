@@ -163,6 +163,27 @@ main(void) {
 		assert(call_c(L, lmakeindex, buf, n, 1) == LUA_ERRRUN);
 	}
 
+	/* makeindex must reject a top-level document whose declared length is
+	 * < 5 (no room for the trailing NUL and at least one byte): get_length
+	 * - 5 yields a negative br->size that previously cast to a huge size_t
+	 * in check_reader and let read_byte/read_cstring read out of bounds. */
+	{
+		/* length 4: only the length field, no trailing NUL. */
+		uint8_t tiny[4] = { 4, 0, 0, 0 };
+		assert(call_c(L, lmakeindex, tiny, sizeof(tiny), 1) == LUA_ERRRUN);
+	}
+	{
+		/* length 0: empty prefix. */
+		uint8_t zero[4] = { 0, 0, 0, 0 };
+		assert(call_c(L, lmakeindex, zero, sizeof(zero), 1) == LUA_ERRRUN);
+	}
+	{
+		/* negative declared length. */
+		uint8_t neg[4];
+		put_i32(neg, -1);
+		assert(call_c(L, lmakeindex, neg, sizeof(neg), 1) == LUA_ERRRUN);
+	}
+
 	printf("bson: all assertions passed\n");
 	lua_close(L);
 	return 0;

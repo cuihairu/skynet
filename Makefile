@@ -142,8 +142,8 @@ TEST_CFLAGS = -g -O2 -Wall -Iskynet-src -Ilualib-src -I$(LUA_INC) -I$(JEMALLOC_I
 # the cross compiler is unavailable.
 test_dlfcn_mingw_check : test/test_dlfcn_mingw.c 3rd/compat-mingw/dlfcn.c 3rd/compat-mingw/dlfcn.h
 	@if command -v $(MINGW_CC) >/dev/null 2>&1; then \
-		$(MINGW_CC) -c -I3rd/compat-mingw test/test_dlfcn_mingw.c -o test/test_dlfcn_mingw.o; \
-		$(MINGW_CC) -c -I3rd/compat-mingw 3rd/compat-mingw/dlfcn.c -o test/dlfcn_mingw.o; \
+		$(MINGW_CC) -c -I3rd/compat-mingw test/test_dlfcn_mingw.c -o test/test_dlfcn_mingw.o || exit 1; \
+		$(MINGW_CC) -c -I3rd/compat-mingw 3rd/compat-mingw/dlfcn.c -o test/dlfcn_mingw.o || exit 1; \
 		echo "mingw dlfcn shim: compile check passed"; \
 	else \
 		echo "mingw dlfcn shim: skipped (no $(MINGW_CC))"; \

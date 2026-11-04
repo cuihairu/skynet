@@ -62,3 +62,9 @@ P2/P3 items from the 2026-11-01 code review (docs/review/2026-11-01-code-review.
 
 - [x] 审核发现：新增 dlclose 返回类型为 void，与 POSIX dlfcn 契约 `int dlclose(void*)` 不符；该 shim 是 `<dlfcn.h>` 的替代实现（skynet-src/skynet_module.c:9、3rd/lua/loadlib.c:101 均按 POSIX 签名使用），任何按标准 `if (dlclose(h)!=0)` 检查返回值的调用在 mingw 下会编译失败而 Linux 下正常，且 FreeLibrary 的 BOOL 结果被丢弃、卸载失败完全不可探测（3rd/compat-mingw/dlfcn.h:8，3rd/compat-mingw/dlfcn.c:22） — 属实，fixed 6dcf821（3rd/compat-mingw/dlfcn.h dlclose 改 int；dlfcn.c 返回 FreeLibrary 结果 0/-1；make test_dlfcn_mingw_check 编译通过）
 - [x] 审核发现：新增的 dlclose 无任何测试覆盖；现有 test/test_module 仅以 -ldl 覆盖 POSIX 加载路径，未编译/执行 compat-mingw shim 的 dlclose 路径（3rd/compat-mingw/dlfcn.c:22） — 属实，fixed 6dcf821（新增 test/test_dlfcn_mingw.c 编译检查 + Makefile test_dlfcn_mingw_check；make test 全绿）
+
+## 审核（b10ae677..HEAD）
+
+- [x] 审核发现：lmakeindex 对长度 <5 的畸形 BSON 顶层文档会得到负 br->size，check_reader 改为 `(size_t)br->size` 比较后负 int 转成巨大 size_t 而绕过边界检查，read_byte/read_cstring 越界读（ASAN 复现 heap-buffer-overflow，基线 b10ae67 正常报错；lualib-src/lua-bson.c:96-100,763） — 属实，fixed（lualib-src/lua-bson.c:96-100 check_reader 先判 br->size<0 短路；test/test_bson.c 新增 len=4/0/负 三条断言；ASAN 复现基线 heap-buffer-overflow at read_byte:106，修复后无越界；make test 全绿）
+- [x] 审核发现：Makefile test_dlfcn_mingw_check 的 if 分支以 echo 结尾，任意编译命令失败时 shell 退出码被 echo 掩盖，make 仍报告成功并打印 "compile check passed"，编译检查形同虚设（Makefile:143-148） — 属实，fixed（Makefile test_dlfcn_mingw_check 两处编译命令加 `|| exit 1`；实测注入 #error 后 make 返回非零 EXIT=2，不再被 echo 掩盖；make test 全绿）
+- [x] 审核发现：atomic_meminfo_init 注释声称 ATOM_STORE 为 seq_cst，但在 __STDC_NO_ATOMICS__ 分支（skynet-src/atomic.h:13-15）ATOM_STORE 仅为普通赋值，注释与实现不符（skynet-src/mem_info.c:13-14） — 属实，fixed（skynet-src/mem_info.c:13-14 注释改述 seq_cst 仅当 <stdatomic.h>/<atomic> 可用，__STDC_NO_ATOMICS__ 分支退化为普通赋值、无顺序保证；make test 全绿）
