@@ -43,6 +43,20 @@ concurrent_worker(void *arg) {
 	return NULL;
 }
 
+static struct mem_data * merge_slot = NULL;
+
+static void *
+merge_worker(void *arg) {
+	(void)arg;
+	/* Hammer atomic_meminfo_merge and assert a dump never sees alloc < free. */
+	for (int i = 0; i < 2000; i++) {
+		MemInfo m = {};
+		atomic_meminfo_merge(&m, &merge_slot->info);
+		assert(m.alloc >= m.free);
+	}
+	return NULL;
+}
+
 /* Count entries in the table at the top of the stack. */
 static int
 count_entries(lua_State *L) {
@@ -127,33 +141,25 @@ main(void) {
 	assert(count_entries(L) == 2);
 	lua_pop(L, 1);
 
-	/* A new handle takes a fresh slot (the table is far from full here).
-	 * The lazy balanced-slot reclaim is exercised directly below. */
+	/* A new handle takes a fresh slot (the table is far from full here). */
 	uint32_t h3 = h1 + 2 * SLOT_SIZE;
 	update_xmalloc_stat_alloc(h3, 7);
 	used = malloc_used_memory();
 	printf("used=%zu (expect 7)\n", used);
 	assert(used == 7);
 
-	/* Directly exercise reclaim: h1's slot is balanced, so find_mem_stat
-	 * with a new handle that would otherwise need a slot can reuse it once
-	 * every slot is taken.  Simulate a full table by handing out all slots
-	 * is impractical (65536), so instead verify the reclaim branch by
-	 * forcing the search to consider h1's balanced slot: allocate a new
-	 * handle, then free it to a balanced state and confirm a subsequent
-	 * reserve picks the same slot via the balanced path. */
+	/* Slots are retained after their counters balance out (no lazy reclaim),
+	 * so h1 keeps its slot and a fresh handle always gets a fresh slot while
+	 * the table has room.  h1's balanced slot must still be owned by h1. */
 	{
 		struct mem_data *d1 = find_mem_stat(h1, 1);
 		assert(d1 != NULL);
-		/* Release h1 fully (already balanced above). */
 		uint32_t cur = (uint32_t)ATOM_LOAD(&d1->handle);
 		assert(cur == h1);
-		uint32_t newh = 0x77777777;
-		/* Force reuse: temporarily claim by directly invoking the reclaim
-		 * logic through a full scan helper is not exposed, so just assert
-		 * the balanced slot is a valid candidate by checking counts. */
+		/* h1 allocated 100 and freed 100, so its counters are balanced. */
 		assert(ATOM_LOAD(&d1->info.alloc_count) == ATOM_LOAD(&d1->info.free_count));
-		/* Reserve a new handle (gets a fresh slot). */
+		/* Reserve a new handle: it gets a fresh slot, not h1's slot. */
+		uint32_t newh = 0x77777777;
 		update_xmalloc_stat_alloc(newh, 3);
 		used = malloc_used_memory();
 		printf("used=%zu (expect 10)\n", used);
@@ -191,34 +197,29 @@ main(void) {
 	memset(mp, 0x12, 10);
 	skynet_free(mp);
 
-	/* Concurrent reservation vs dump: merge must never observe alloc=0 with
-	 * free=old (underflow).  We drive find_mem_stat(reserve) and the merge
-	 * loop in parallel against one slot and assert alloc >= free whenever
-	 * the slot reports a live handle. */
+	/* Concurrent dump vs alloc/free: merge must never observe alloc < free
+	 * (underflow).  One thread interleaves atomic alloc/free on a live slot
+	 * while several other threads hammer atomic_meminfo_merge on the same
+	 * slot and assert alloc >= free.  The dump reads free before alloc, so
+	 * underflow is impossible for the monotonic, always-free<=alloc counters. */
 	{
 		#define NTHREAD 4
 		#define NITER 2000
-		static uint32_t handles[NTHREAD] = {0x111, 0x222, 0x333, 0x444};
-		struct mem_data *slots[NTHREAD];
-		for (int i = 0; i < NTHREAD; i++) {
-			slots[i] = find_mem_stat(handles[i], 1);
-			assert(slots[i] != NULL);
-		}
-		/* Release all slots first. */
-		for (int i = 0; i < NTHREAD; i++) {
-			ATOM_STORE(&slots[i]->handle, 0);
-		}
-		/* Reuse handle 0x111 slot, then hammer merge from other threads. */
 		uint32_t h = 0x111;
-		struct mem_data *d = find_mem_stat(h, 1);
-		assert(d != NULL);
-		atomic_meminfo_alloc(&d->info, 100);
-		for (int i = 0; i < NITER; i++) {
-			MemInfo m = {};
-			atomic_meminfo_merge(&m, &d->info);
-			assert(m.alloc >= m.free);
+		merge_slot = find_mem_stat(h, 1);
+		assert(merge_slot != NULL);
+
+		pthread_t th[NTHREAD + 1];
+		/* One writer thread interleaves alloc/free. */
+		pthread_create(&th[0], NULL, concurrent_worker, (void *)(uintptr_t)h);
+		/* Reader threads hammer merge and assert no underflow. */
+		for (int i = 0; i < NTHREAD; i++) {
+			pthread_create(&th[i + 1], NULL, merge_worker, NULL);
 		}
-		ATOM_STORE(&d->handle, 0);
+		for (int i = 0; i < NTHREAD + 1; i++) {
+			pthread_join(th[i], NULL);
+		}
+		ATOM_STORE(&merge_slot->handle, 0);
 	}
 
 	/* True multi-threaded alloc/free across distinct handles, plus one

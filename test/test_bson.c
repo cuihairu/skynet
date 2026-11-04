@@ -141,6 +141,28 @@ main(void) {
 		lua_pop(L, 2);
 	}
 
+	/* makeindex must reject a BSON_STRING length of 0 (unpack_dict uses
+	 * sz <= 0, but lmakeindex previously accepted sz == 0). */
+	{
+		put_i32(payload, 0);
+		int n = build_doc(buf, BSON_STRING, "k", 4, payload);
+		assert(call_c(L, lmakeindex, buf, n, 1) == LUA_ERRRUN);
+	}
+
+	/* makeindex must not overflow on an INT32_MAX-length DBPOINTER (sz+12)
+	 * or BINARY (sz+1): the size_t arithmetic must reject it before it can
+	 * wrap around to a small positive read. */
+	{
+		put_i32(payload, INT32_MAX);
+		int n = build_doc(buf, BSON_DBPOINTER, "k", 4, payload);
+		assert(call_c(L, lmakeindex, buf, n, 1) == LUA_ERRRUN);
+	}
+	{
+		put_i32(payload, INT32_MAX);
+		int n = build_doc(buf, BSON_BINARY, "k", 4, payload);
+		assert(call_c(L, lmakeindex, buf, n, 1) == LUA_ERRRUN);
+	}
+
 	printf("bson: all assertions passed\n");
 	lua_close(L);
 	return 0;

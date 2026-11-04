@@ -56,15 +56,16 @@ hash_handle(uint32_t handle) {
 }
 
 // Locate the slot owned by handle, or (when reserve != 0) the first free slot
-// and reserve it for handle with a compare-exchange.  When no free slot is
-// available, reclaim a slot whose counters are balanced (no live allocations
-// from its previous owner) instead of returning NULL, so the table can serve
-// more handles than SLOT_SIZE over time.  Returns NULL only if every slot is
-// owned by a live allocation; the caller then drops the stat.
+// and reserve it for handle with a compare-exchange.  Slots are retained after
+// their counters balance out; reclaiming them for another handle cannot be made
+// race-free without an allocation-side lock because a cross-thread free can
+// race with a new allocation.  For a non-reserving lookup, hitting an empty
+// slot proves the handle has no slot (slots are never removed), so the scan
+// stops instead of walking the whole 65536-entry table.  Returns NULL only if
+// the handle is absent (or, for reserve, the table is full).
 static struct mem_data *
 find_mem_stat(uint32_t handle, int reserve) {
 	uint32_t h = hash_handle(handle);
-	struct mem_data *reclaim = NULL;
 	for (uint32_t i = 0; i < SLOT_SIZE; i++) {
 		struct mem_data *data = &mem_stats[(h + i) & (SLOT_SIZE - 1)];
 		uint32_t cur = (uint32_t)ATOM_LOAD(&data->handle);
@@ -80,21 +81,10 @@ find_mem_stat(uint32_t handle, int reserve) {
 				return data;
 			}
 		}
-		if (reserve && reclaim == NULL && cur != 0) {
-			// Remember a balanced slot owned by another (now inactive)
-			// handle so we can reuse it if the table is full.
-			if (ATOM_LOAD(&data->info.alloc_count) == ATOM_LOAD(&data->info.free_count)) {
-				reclaim = data;
-			}
-		}
-	}
-	if (reserve && reclaim) {
-		uint32_t cur = (uint32_t)ATOM_LOAD(&reclaim->handle);
-		if (cur != 0 && ATOM_LOAD(&reclaim->info.alloc_count) == ATOM_LOAD(&reclaim->info.free_count)) {
-			if (ATOM_CAS_ULONG(&reclaim->handle, cur, handle)) {
-				atomic_meminfo_init(&reclaim->info);
-				return reclaim;
-			}
+		if (!reserve && cur == 0) {
+			// Empty slot in the probe chain: the handle cannot be present,
+			// because slots are never reclaimed or re-inserted past a gap.
+			return NULL;
 		}
 	}
 	return NULL;
@@ -125,10 +115,6 @@ update_xmalloc_stat_free(uint32_t handle, size_t __n) {
 	struct mem_data *data = find_mem_stat(handle, 0);
 	if (data) {
 		atomic_meminfo_free(&data->info, __n);
-		// The slot is not cleared here: a cross-thread free can race with the
-		// owning thread's alloc, and clearing would drop the alloc's counter
-		// and permanently skew that service's mem_stats.  Instead the slot is
-		// reclaimed lazily by find_mem_stat when a balanced slot is reused.
 	}
 }
 

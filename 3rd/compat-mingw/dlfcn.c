@@ -19,6 +19,6 @@ void *dlsym(void *dl, const char *sym) {
 }
 
 
-void dlclose(void *dl) {
-    FreeLibrary((HMODULE)dl);
+int dlclose(void *dl) {
+    return FreeLibrary((HMODULE)dl) ? 0 : -1;
 }

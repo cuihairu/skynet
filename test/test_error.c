@@ -23,9 +23,6 @@ static atomic_int find_calls = 0;
 static atomic_int push_count = 0;
 static atomic_int push_handle_ok = 1;
 
-void *skynet_realloc(void *ptr, size_t sz) { (void)ptr; (void)sz; return NULL; }
-void *skynet_calloc(size_t n, size_t sz) { return calloc(n, sz); }
-
 #define LOG_MESSAGE_SIZE 256
 #include "../skynet-src/skynet_error.c"
 

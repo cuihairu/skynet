@@ -9,10 +9,13 @@ meminfo_init(MemInfo *info) {
 
 void
 atomic_meminfo_init(AtomicMemInfo *info) {
-    ATOM_INIT(&info->alloc, 0);
-    ATOM_INIT(&info->alloc_count, 0);
-    ATOM_INIT(&info->free, 0);
-    ATOM_INIT(&info->free_count, 0);
+    /* Store free before alloc so a concurrent merge that reads free
+     * first always sees free <= alloc.  ATOM_STORE is seq_cst, which
+     * also provides the ordering needed on weak memory models. */
+    ATOM_STORE(&info->free_count, 0);
+    ATOM_STORE(&info->free, 0);
+    ATOM_STORE(&info->alloc_count, 0);
+    ATOM_STORE(&info->alloc, 0);
 }
 
 void
@@ -50,14 +53,13 @@ meminfo_merge(MemInfo *dest, const MemInfo *src) {
 void
 atomic_meminfo_merge(MemInfo *dest, const AtomicMemInfo *src) {
     MemInfo info;
-    // Load alloc before free to match the init order in atomic_meminfo_init
-    // (alloc first, then free).  A concurrent dump that observes the slot
-    // between reservation and init then sees either the old pair (both old)
-    // or the new pair (both zero) instead of alloc=0 with free=old, which
-    // would underflow dest->alloc - dest->free.
-    info.alloc_count = ATOM_LOAD(&src->alloc_count);
-    info.alloc = ATOM_LOAD(&src->alloc);
+    /* Read free before alloc.  For normal concurrent alloc/free,
+     * free(Tf) <= free(Ta) <= alloc(Ta) for Tf < Ta, so this order
+     * prevents underflow.  For slot reclaim, init writes free=0 before
+     * alloc=0, so a merge that reads free=0 first is also safe. */
     info.free_count = ATOM_LOAD(&src->free_count);
     info.free = ATOM_LOAD(&src->free);
+    info.alloc_count = ATOM_LOAD(&src->alloc_count);
+    info.alloc = ATOM_LOAD(&src->alloc);
     meminfo_merge(dest, &info);
 }

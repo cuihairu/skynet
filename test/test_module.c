@@ -11,6 +11,12 @@ main(void) {
 	assert(M->count == 0);
 	assert(M->m[0].module == NULL);
 	assert(M->m[0].name == NULL);
+	/* open_sym pointed these into the library before dlclose; they must not
+	 * survive as dangling pointers in the unused slot. */
+	assert(M->m[0].create == NULL);
+	assert(M->m[0].init == NULL);
+	assert(M->m[0].release == NULL);
+	assert(M->m[0].signal == NULL);
 
 	struct skynet_module *module = skynet_module_query("module_with_init");
 	assert(module != NULL);

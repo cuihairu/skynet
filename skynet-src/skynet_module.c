@@ -127,6 +127,13 @@ skynet_module_query(const char * name) {
 				dlclose(dl);
 				M->m[index].module = NULL;
 				M->m[index].name = NULL;
+				// open_sym already pointed create/init/release/signal into
+				// the unloaded library; clear them so the slot holds no
+				// dangling pointers.
+				M->m[index].create = NULL;
+				M->m[index].init = NULL;
+				M->m[index].release = NULL;
+				M->m[index].signal = NULL;
 			}
 		}
 	}

@@ -51,8 +51,15 @@ main(void) {
 
 	/* Force a reopen against a path that cannot be opened.  The old stream
 	 * must stay valid. */
-	logger_cb(NULL, inst, PTYPE_SYSTEM, 0, 0, "/nonexistent/dir/log", 0);
+	/* logger_cb(PTYPE_SYSTEM) reopens inst->filename, not the msg argument;
+	 * point the instance at an unwritable path so the fopen branch really
+	 * fails and the previous handle survives. */
+	char * saved = inst->filename;
+	inst->filename = "/nonexistent/dir/log";
+	logger_cb(NULL, inst, PTYPE_SYSTEM, 0, 0, NULL, 0);
 	assert(inst->handle != NULL);
+	/* Restore the original filename so the message lands in the temp file. */
+	inst->filename = saved;
 
 	/* Writing after the failed reopen must still land in the original file. */
 	const char * msg = "post-failed-reopen";

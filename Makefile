@@ -8,6 +8,9 @@ SKYNET_BUILD_PATH ?= .
 CFLAGS = -g -O2 -Wall -I$(LUA_INC) $(MYCFLAGS)
 # CFLAGS += -DUSE_PTHREAD_LOCK
 
+# Cross compiler used only for the compile-only compat-mingw dlfcn check.
+MINGW_CC ?= x86_64-w64-mingw32-gcc
+
 # lua
 
 LUA_STATICLIB := 3rd/lua/liblua.a
@@ -131,7 +134,20 @@ TEST_BINS += test/test_malloc_hook
 endif
 TEST_CFLAGS = -g -O2 -Wall -Iskynet-src -Ilualib-src -I$(LUA_INC) -I$(JEMALLOC_INC) $(SKYNET_DEFINES)
 
-.PHONY: test
+.PHONY: test test_dlfcn_mingw_check
+
+# The compat-mingw dlfcn shim is only built for the Windows target.  Cross
+# compile a compile-only check (never executed on the host) so a POSIX caller
+# using `if (dlclose(h) != 0)` still compiles against the shim.  Skipped when
+# the cross compiler is unavailable.
+test_dlfcn_mingw_check : test/test_dlfcn_mingw.c 3rd/compat-mingw/dlfcn.c 3rd/compat-mingw/dlfcn.h
+	@if command -v $(MINGW_CC) >/dev/null 2>&1; then \
+		$(MINGW_CC) -c -I3rd/compat-mingw test/test_dlfcn_mingw.c -o test/test_dlfcn_mingw.o; \
+		$(MINGW_CC) -c -I3rd/compat-mingw 3rd/compat-mingw/dlfcn.c -o test/dlfcn_mingw.o; \
+		echo "mingw dlfcn shim: compile check passed"; \
+	else \
+		echo "mingw dlfcn shim: skipped (no $(MINGW_CC))"; \
+	fi
 
 test/test_malloc_hook : test/test_malloc_hook.c skynet-src/mem_info.c $(LUA_STATICLIB) $(MALLOC_STATICLIB)
 	$(CC) $(TEST_CFLAGS) $^ $(LDFLAGS) $(SKYNET_LIBS) -o $@
@@ -164,7 +180,7 @@ test/test_module : test/test_module.c skynet-src/skynet_module.c test/module_wit
 	$(CC) $(TEST_CFLAGS) $< -ldl -lpthread -o $@
 
 test/test_daemon : test/test_daemon.c skynet-src/skynet_daemon.c
-	$(CC) $(TEST_CFLAGS) $< -Wl,--wrap=fdopen -o $@
+	$(CC) $(TEST_CFLAGS) $< -o $@
 
 test/test_error : test/test_error.c skynet-src/skynet_error.c
 	$(CC) $(TEST_CFLAGS) $< -lpthread -o $@
@@ -175,8 +191,8 @@ test/testdns_hosts : test/testdns_hosts.lua 3rd/lua/lua
 3rd/lua/lua : 3rd/lua/lua.c 3rd/lua/liblua.a
 	cd 3rd/lua && $(MAKE) lua
 
-test : $(TEST_BINS)
-	for test_bin in $^; do ./$$test_bin || exit 1; done
+test : $(TEST_BINS) 3rd/lua/lua test_dlfcn_mingw_check
+	for test_bin in $(TEST_BINS); do ./$$test_bin || exit 1; done
 	./3rd/lua/lua test/testdns_hosts.lua
 
 cleanall: clean

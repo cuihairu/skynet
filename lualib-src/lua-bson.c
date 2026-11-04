@@ -93,9 +93,9 @@ bson_reserve(struct bson *b, int sz) {
 }
 
 static inline void
-check_reader(lua_State *L, struct bson_reader *br, int sz) {
-	if (br->size < sz) {
-		luaL_error(L, "Invalid bson block (%d:%d)", br->size, sz);
+check_reader(lua_State *L, struct bson_reader *br, size_t sz) {
+	if ((size_t)br->size < sz) {
+		luaL_error(L, "Invalid bson block (%d:%zu)", br->size, sz);
 	}
 }
 
@@ -149,10 +149,7 @@ read_double(lua_State *L, struct bson_reader *br) {
 }
 
 static inline const void *
-read_bytes(lua_State *L, struct bson_reader *br, int sz) {
-	if (sz < 0) {
-		luaL_error(L, "Invalid bson block length %d", sz);
-	}
+read_bytes(lua_State *L, struct bson_reader *br, size_t sz) {
 	const void * r = br->ptr;
 	check_reader(L, br, sz);
 	br->ptr+=sz;
@@ -609,7 +606,7 @@ unpack_dict(lua_State *L, struct bson_reader *br, bool array) {
 	if (sz < 5) {
 		luaL_error(L, "Invalid bson document length %d", sz);
 	}
-	const void * bytes = read_bytes(L, br, sz-5);
+	const void * bytes = read_bytes(L, br, (size_t)sz - 5);
 	struct bson_reader t = { (const uint8_t*)bytes, sz-5 };
 	int end = read_byte(L, br);
 	if (end != '\0') {
@@ -642,7 +639,7 @@ unpack_dict(lua_State *L, struct bson_reader *br, bool array) {
 			if (sz <= 0) {
 				luaL_error(L, "Invalid bson string , length = %d", sz);
 			}
-			lua_pushlstring(L, (const char*)read_bytes(L, &t, sz), sz-1);
+			lua_pushlstring(L, (const char*)read_bytes(L, &t, (size_t)sz), (size_t)sz-1);
 			break;
 		}
 		case BSON_DOCUMENT:
@@ -663,7 +660,7 @@ unpack_dict(lua_State *L, struct bson_reader *br, bool array) {
 			luaL_addchar(&b, 0);
 			luaL_addchar(&b, BSON_BINARY);
 			luaL_addchar(&b, subtype);
-			luaL_addlstring(&b, (const char*)read_bytes(L, &t, sz), sz);
+			luaL_addlstring(&b, (const char*)read_bytes(L, &t, (size_t)sz), (size_t)sz);
 			luaL_pushresult(&b);
 			break;
 		}
@@ -724,8 +721,8 @@ unpack_dict(lua_State *L, struct bson_reader *br, bool array) {
 			if (sz < 0) {
 				luaL_error(L, "Invalid bson dbpointer length %d", sz);
 			}
-			read_bytes(L, &t, sz+12);
-			make_object(L, BSON_DBPOINTER, ptr, sz + 16);
+			read_bytes(L, &t, (size_t)sz + 12);
+			make_object(L, BSON_DBPOINTER, ptr, (size_t)sz + 16);
 			break;
 		}
 		case BSON_JSCODE:
@@ -735,8 +732,8 @@ unpack_dict(lua_State *L, struct bson_reader *br, bool array) {
 			if (sz < 0) {
 				luaL_error(L, "Invalid bson code/symbol length %d", sz);
 			}
-			read_bytes(L, &t, sz);
-			make_object(L, bt, ptr, sz + 4);
+			read_bytes(L, &t, (size_t)sz);
+			make_object(L, bt, ptr, (size_t)sz + 4);
 			break;
 		}
 		case BSON_CODEWS: {
@@ -745,8 +742,8 @@ unpack_dict(lua_State *L, struct bson_reader *br, bool array) {
 			if (sz < 4) {
 				luaL_error(L, "Invalid bson codews length %d", sz);
 			}
-			read_bytes(L, &t, sz-4);
-			make_object(L, bt, ptr, sz);
+			read_bytes(L, &t, (size_t)sz - 4);
+			make_object(L, bt, ptr, (size_t)sz);
 			break;
 		}
 		default:
@@ -783,14 +780,21 @@ lmakeindex(lua_State *L) {
 		case BSON_BOOLEAN:
 			field_size = 1;
 			break;
-		case BSON_JSCODE:
-		case BSON_SYMBOL: 
-		case BSON_STRING: {
+			case BSON_JSCODE:
+			case BSON_SYMBOL: {
 			int sz = read_int32(L, &br);
 			if (sz < 0) {
 				luaL_error(L, "Invalid bson string length %d", sz);
 			}
-			read_bytes(L, &br, sz);
+				read_bytes(L, &br, (size_t)sz);
+				break;
+			}
+			case BSON_STRING: {
+				int sz = read_int32(L, &br);
+				if (sz <= 0) {
+					luaL_error(L, "Invalid bson string length %d", sz);
+				}
+				read_bytes(L, &br, (size_t)sz);
 			break;
 		}
 		case BSON_CODEWS:
@@ -800,7 +804,7 @@ lmakeindex(lua_State *L) {
 			if (sz < 4) {
 				luaL_error(L, "Invalid bson subdoc length %d", sz);
 			}
-			read_bytes(L, &br, sz-4);
+				read_bytes(L, &br, (size_t)sz - 4);
 			break;
 		}
 		case BSON_BINARY: {
@@ -808,7 +812,7 @@ lmakeindex(lua_State *L) {
 			if (sz < 0) {
 				luaL_error(L, "Invalid bson binary length %d", sz);
 			}
-			read_bytes(L, &br, sz+1);
+			read_bytes(L, &br, (size_t)sz + 1);
 			break;
 		}
 		case BSON_OBJECTID:
@@ -833,7 +837,7 @@ lmakeindex(lua_State *L) {
 			if (sz < 0) {
 				luaL_error(L, "Invalid bson dbpointer length %d", sz);
 			}
-			read_bytes(L, &br, sz+12);
+			read_bytes(L, &br, (size_t)sz + 12);
 			break;
 		}
 		default:
@@ -844,7 +848,7 @@ lmakeindex(lua_State *L) {
 		}
 		if (field_size > 0) {
 			int id = bt | (int)(br.ptr - start) << BSON_TYPE_SHIFT;
-			read_bytes(L, &br, field_size);
+			read_bytes(L, &br, (size_t)field_size);
 			lua_pushlstring(L, key, klen);
 			lua_pushinteger(L,id);
 			lua_rawset(L,-3);
