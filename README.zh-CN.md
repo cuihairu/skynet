@@ -36,7 +36,7 @@ bash test/run_autotest.sh testcrypt testbson testsha testcoroutine testtimeout t
 ## 本地文档
 
 ```sh
-npm ci
+pnpm install --frozen-lockfile
 npm run docs:check
 npm run docs:dev
 ```

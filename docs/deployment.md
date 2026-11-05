@@ -3,7 +3,7 @@
 This site uses the checked-in VitePress configuration. English pages live under docs/ and Chinese pages under docs/zh/.
 
 ```sh
-npm ci
+pnpm install --frozen-lockfile
 npm run docs:check
 npm run docs:dev
 ```
@@ -21,7 +21,7 @@ The build output is `docs/.vitepress/dist`. The base path is `/skynet/`, with `/
 
 ## GitHub Pages publication
 
-The current workflow runs for documentation-related paths on master and for manual dispatch. It installs with npm ci, checks links, builds, uploads a Pages artifact and deploys with deploy-pages. Configure repository Pages to use GitHub Actions. No separate gh-pages branch or force-push deployment script is needed.
+The current workflow runs for documentation-related paths on master and for manual dispatch. It installs with pnpm install --frozen-lockfile, checks links, builds, uploads a Pages artifact and deploys with deploy-pages. Configure repository Pages to use GitHub Actions. No separate gh-pages branch or force-push deployment script is needed.
 
 [.github/workflows/deploy-docs.yml:12](https://github.com/cuihairu/skynet/blob/f9f8ae60b9ad287a69280f04ce6097e5c4c9f58b/.github/workflows/deploy-docs.yml#L12); [.github/workflows/deploy-docs.yml:63](https://github.com/cuihairu/skynet/blob/f9f8ae60b9ad287a69280f04ce6097e5c4c9f58b/.github/workflows/deploy-docs.yml#L63)
 

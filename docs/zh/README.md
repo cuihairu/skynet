@@ -3,7 +3,7 @@
 本站使用仓库现有的 VitePress 配置，中英文页面分别位于 docs/ 与 docs/zh/。
 
 ```sh
-npm ci
+pnpm install --frozen-lockfile
 npm run docs:check
 npm run docs:dev
 ```
@@ -21,7 +21,7 @@ npm run docs:preview
 
 ## GitHub Pages 发布
 
-当前工作流在 master 分支的文档相关路径变化或手动触发时执行。它运行 npm ci、链接检查和文档构建，再上传 Pages artifact 并使用 deploy-pages 发布。仓库 Pages 设置应使用 GitHub Actions；不需要另建 gh-pages 分支，也不应执行旧文档中的强制推送脚本。
+当前工作流在 master 分支的文档相关路径变化或手动触发时执行。它运行 pnpm install --frozen-lockfile、链接检查和文档构建，再上传 Pages artifact 并使用 deploy-pages 发布。仓库 Pages 设置应使用 GitHub Actions；不需要另建 gh-pages 分支，也不应执行旧文档中的强制推送脚本。
 
 [.github/workflows/deploy-docs.yml:12](https://github.com/cuihairu/skynet/blob/f9f8ae60b9ad287a69280f04ce6097e5c4c9f58b/.github/workflows/deploy-docs.yml#L12); [.github/workflows/deploy-docs.yml:63](https://github.com/cuihairu/skynet/blob/f9f8ae60b9ad287a69280f04ce6097e5c4c9f58b/.github/workflows/deploy-docs.yml#L63)
 

@@ -8,7 +8,7 @@ echo ""
 # 检查依赖
 if [ ! -d "node_modules" ]; then
     echo "正在安装依赖..."
-    npm install
+    pnpm install --frozen-lockfile
 fi
 
 # 显示菜单

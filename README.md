@@ -36,7 +36,7 @@ The bundled Lua source reports **5.5.1**, in [3rd/lua/lua.h](3rd/lua/lua.h).
 ## Local documentation
 
 ```sh
-npm ci
+pnpm install --frozen-lockfile
 npm run docs:check
 npm run docs:dev
 ```
