@@ -6,6 +6,10 @@ echo "=== Skynet 源码解析文档 ==="
 echo ""
 
 # 检查依赖
+if ! command -v pnpm >/dev/null 2>&1; then
+    echo "错误: 未找到 pnpm。请先启用它（Node.js 20+: corepack enable pnpm）或按 https://pnpm.io/zh/installation 安装。"
+    exit 1
+fi
 if [ ! -d "node_modules" ]; then
     echo "正在安装依赖..."
     pnpm install --frozen-lockfile
@@ -23,15 +27,15 @@ read -p "请输入选项 (1-4): " choice
 case $choice in
     1)
         echo "启动开发服务器..."
-        npm run docs:dev
+        pnpm run docs:dev
         ;;
     2)
         echo "构建生产版本..."
-        npm run docs:build
+        pnpm run docs:build
         ;;
     3)
         echo "预览生产版本..."
-        npm run docs:preview
+        pnpm run docs:preview
         ;;
     4)
         echo "退出"

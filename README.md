@@ -35,13 +35,15 @@ The bundled Lua source reports **5.5.1**, in [3rd/lua/lua.h](3rd/lua/lua.h).
 
 ## Local documentation
 
+pnpm drives the docs toolchain. Enable it with `corepack enable pnpm` (Node.js 20+) or install it from [pnpm.io](https://pnpm.io/installation). Then:
+
 ```sh
 pnpm install --frozen-lockfile
-npm run docs:check
-npm run docs:dev
+pnpm run docs:check
+pnpm run docs:dev
 ```
 
-After the development server starts, open the `/skynet/` path on the port it prints. The default requested port is 5173; an existing service may already occupy it. Build with `npm run docs:build` and preview with `npm run docs:preview`.
+After the development server starts, open the `/skynet/` path on the port it prints. The default requested port is 5173; an existing service may already occupy it. Build with `pnpm run docs:build` and preview with `pnpm run docs:preview`.
 
 ## Upstream and license
 

@@ -35,13 +35,15 @@ bash test/run_autotest.sh testcrypt testbson testsha testcoroutine testtimeout t
 
 ## 本地文档
 
+文档工具链使用 pnpm。可通过 `corepack enable pnpm`（Node.js 20+）启用，或按 [pnpm.io](https://pnpm.io/zh/installation) 安装。然后执行：
+
 ```sh
 pnpm install --frozen-lockfile
-npm run docs:check
-npm run docs:dev
+pnpm run docs:check
+pnpm run docs:dev
 ```
 
-启动后打开终端所示端口的 `/skynet/zh/` 路径。默认请求端口是 5173，若已有服务占用，应使用实际分配的端口。生产构建运行 `npm run docs:build`，预览运行 `npm run docs:preview`。
+启动后打开终端所示端口的 `/skynet/zh/` 路径。默认请求端口是 5173，若已有服务占用，应使用实际分配的端口。生产构建运行 `pnpm run docs:build`，预览运行 `pnpm run docs:preview`。
 
 ## 上游与许可证
 
