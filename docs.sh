@@ -7,7 +7,7 @@ echo ""
 
 # 检查依赖
 if ! command -v pnpm >/dev/null 2>&1; then
-    echo "错误: 未找到 pnpm。请先启用它（Node.js 20+: corepack enable pnpm）或按 https://pnpm.io/zh/installation 安装。"
+    echo "错误: 未找到 pnpm。请先启用它（Node.js 22.12+: corepack enable pnpm）或按 https://pnpm.io/zh/installation 安装。"
     exit 1
 fi
 if [ ! -d "node_modules" ]; then

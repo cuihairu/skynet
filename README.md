@@ -35,7 +35,7 @@ The bundled Lua source reports **5.5.1**, in [3rd/lua/lua.h](3rd/lua/lua.h).
 
 ## Local documentation
 
-pnpm drives the docs toolchain. Enable it with `corepack enable pnpm` (Node.js 20+) or install it from [pnpm.io](https://pnpm.io/installation). Then:
+pnpm drives the docs toolchain. Enable it with `corepack enable pnpm` (Node.js 22.12+) or install it from [pnpm.io](https://pnpm.io/installation). Then:
 
 ```sh
 pnpm install --frozen-lockfile

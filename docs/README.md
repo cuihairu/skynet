@@ -2,7 +2,7 @@
 
 This site uses the checked-in VitePress configuration. English pages live under docs/ and Chinese pages under docs/zh/.
 
-pnpm drives the toolchain. Enable it with `corepack enable pnpm` (Node.js 20+) or install it from [pnpm.io](https://pnpm.io/installation). Then:
+pnpm drives the toolchain. Enable it with `corepack enable pnpm` (Node.js 22.12+) or install it from [pnpm.io](https://pnpm.io/installation). Then:
 
 ```sh
 pnpm install --frozen-lockfile

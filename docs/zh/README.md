@@ -2,7 +2,7 @@
 
 本站使用仓库现有的 VitePress 配置，中英文页面分别位于 docs/ 与 docs/zh/。
 
-文档工具链使用 pnpm。可通过 `corepack enable pnpm`（Node.js 20+）启用，或按 [pnpm.io](https://pnpm.io/zh/installation) 安装。然后执行：
+文档工具链使用 pnpm。可通过 `corepack enable pnpm`（Node.js 22.12+）启用，或按 [pnpm.io](https://pnpm.io/zh/installation) 安装。然后执行：
 
 ```sh
 pnpm install --frozen-lockfile
