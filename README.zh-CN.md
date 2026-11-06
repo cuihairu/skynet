@@ -35,7 +35,7 @@ bash test/run_autotest.sh testcrypt testbson testsha testcoroutine testtimeout t
 
 ## 本地文档
 
-文档工具链使用 pnpm。可通过 `corepack enable pnpm`（Node.js 22.12+）启用，或按 [pnpm.io](https://pnpm.io/zh/installation) 安装。然后执行：
+文档工具链使用 pnpm。请按 [pnpm.io](https://pnpm.io/zh/installation) 安装；Node.js 22.12–24 也可用内置 Corepack 执行 `corepack enable pnpm` 启用，Node.js 25+ 不再内置 Corepack。然后执行：
 
 ```sh
 pnpm install --frozen-lockfile
