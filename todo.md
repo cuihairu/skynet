@@ -88,3 +88,11 @@ P2/P3 items from the 2026-11-01 code review (docs/review/2026-11-01-code-review.
 - [x] 复测（同口径）：lua-seri.c 49.75%→91.96%、lua-mongo.c 22.03%→89.83%、lua-bson.c 17.93%→73.22%；加权 1598/2960 = 54.0%；make test 11 项全绿
 - [x] 98% 上限说明：全仓约 8 万行 C，socket/timer/harbor 等核心需真实 actor 运行时，单元测试可触达面仅为上述 11 个可离线驱动模块。本轮后残余 1362 行中：lua-socket.c 538 行需真实网络、skynet_daemon.c 56 行为 fork/setsid 守护进程路径（不可进程内测试）、malloc_hook.c 79 行为 jemalloc 注入路径；lua-sharedata.c 344 行（读取 API lreadline/lresolve/getinfo 等）与 bson/seri 残余为后续轮次可补空间。单元测试口径实用上限约 54%，如实记录，不硬凑
 - [x] 静态检查（go vet 等价）：改动文件 -Wall 0 警告；-Wextra 仅命中生产文件既有警告（utf8_copy/is_rawarray/wb_string 符号比较），属禁改范围，未新增
+
+## 覆盖率推进第三轮（2026-11-21，巡检单 cov3-skynet.md）
+
+- [x] 基线（a8e6ead，gcov 行覆盖口径：-O0 --coverage 重建并运行 make test）：lua-sharedata.c 27.27%（473 行），与第二轮记录一致
+- [x] 补测试（表驱动，error 路径/边界，未改生产代码）：test_sharedata.c 扩展覆盖读 API——index 全部值类型/碰撞整数键/命中/未命中/nil 键/浮点键错误、nextkey 全表遍历/键序列/浮点与缺失键、len/hashlen、box/needupdate/update（含同根与类型错误）、markdirty/isdirty、getref/incref/decref、delete（含参数错误）、hash-only 表、hash 嵌套表递归释放、nil 间隙数组、不支持的值类型与键类型错误
+- [x] 复测（同口径）：lua-sharedata.c 27.27%→95.35%（473 行）；make test 11 项全绿；autotest pass=25 fail=0
+- [x] 残余 22 行说明：全部为 malloc 失败路径（156-157/177/301/308/316/337-338/428-437/468，需注入分配失败，离线不可达）或 LUA_TNIL 数组槽分支（129-131/509-511，本 Lua 版本 rawlen 边界永不越过已填槽，真表不可构造），如实记录，不硬凑
+- [x] 静态检查：-Wall 0 警告（改动文件）；生产代码零改动
